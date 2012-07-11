@@ -1,27 +1,36 @@
-main: com.creadri.taxfreeregion.TaxFreeRegion
-version: 0.2
+main: at.lukasf.taxfreeregion.TaxFreeRegion
+version: 1.5
 name: TaxFreeRegion
-author: adreide
-website: http://www.creadri.com
+author: adreide, tickleman, lukasf
+depend: [WorldEdit]
+softdepend: [WorldGuard]
 commands:
   taxfree:
     aliases: tf
     description: 'Tax Free Regions Command'
     usage: |
+      TaxFreeRegion v1.5
       /<command> list
       /<command> add [name]
-      /<command> remove
+      /<command> wgadd [name]
+      /<command> delete
       /<command> reload
+      /<command> clear
+      /<command> reward
 permissions:
   taxfreeregion.*:
     default: op
     description: Allow you to have full access to TaxFreeRegion plugin without having the inventory cleared.
     children:
-      taxfreeregion.noclear: true
+      taxfreeregion.passthrough: true
       taxfreeregion.use: true
-  taxfreeregion.noclear:
+      taxfreeregion.clear: true
+  taxfreeregion.passthrough:
     default: op
-    description: Users that do have this will keep their inventories
+    description: Users that have this will not be affected by entering a region
   taxfreeregion.use:
     default: op
     description: Permits to add/list and remove taxfreeregions
+  taxfreeregion.clear:
+    default: op
+    description: Allows usage of /tf clear
