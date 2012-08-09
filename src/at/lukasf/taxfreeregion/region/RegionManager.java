@@ -113,7 +113,7 @@ public class RegionManager {
 			if(n==null) return;
 			for(String s:n)
 			{
-				boolean wg;
+				boolean wg, wo=false;
 				int x1=0,x2=0,y1=0,y2=0,z1=0,z2=0;
 				String reg = yaml.getString("regions."+s+".region").trim();					
 				if((wg=reg.startsWith("wg|")) && plugin.isWorldGuardSet()){
@@ -127,6 +127,11 @@ public class RegionManager {
 						y2 = r.getMinimumPoint().getBlockY();
 						z2 = r.getMinimumPoint().getBlockZ();}
 					else throw new Exception("Could not find the given WorldGuard region! ("+reg.substring(reg.indexOf('|')+1)+")");
+				}
+				else if(reg.equals("|none|"))
+				{
+					x1=x2=y1=y2=z1=z2=-999;
+					wo=true;
 				}
 				else
 				{
@@ -148,7 +153,7 @@ public class RegionManager {
 					}
 				}			
 
-				Region r = new Region(s, yaml.getString("regions."+s+".world"),x1,x2,y1,y2,z1,z2,wg);
+				Region r = new Region(s, yaml.getString("regions."+s+".world"),x1,x2,y1,y2,z1,z2,wg,wo);
 
 				r.setCrossPlacing(yaml.getBoolean("regions."+s+".cross_placing"));
 
@@ -294,9 +299,6 @@ public class RegionManager {
 					r.setPermissions(perms);
 				}
 
-				/*r.setIndependentHealth(IndependencyMode.valueOf(yaml.getString("regions."+s+".independent.health").trim().toUpperCase()));
-				r.setIndependentHunger(IndependencyMode.valueOf(yaml.getString("regions."+s+".independent.hunger").trim().toUpperCase()));
-				r.setIndependentXp(IndependencyMode.valueOf(yaml.getString("regions."+s+".independent.xp").trim().toUpperCase()));*/
 				regions.put(s, r);
 			}
 
@@ -318,6 +320,11 @@ public class RegionManager {
 	public void addRegion(String name, String world, int x1, int x2, int y1, int y2, int z1, int z2)
 	{		
 		addRegion(name, world, x2+","+y2+","+z2+"|"+x1+","+y1+","+z1);													
+	}
+	
+	public void addRegion(String name, World world)
+	{		
+		addRegion(name, world.getName(), "|none|");				
 	}
 
 	public void addRegion(String name, String world)
@@ -375,7 +382,7 @@ public class RegionManager {
 		while (it.hasNext()) {
 			Region region = (Region)it.next();
 
-			if (region.contains(player.getLocation())) {
+			if (!region.isWorld && region.contains(player.getLocation())) {
 				if (!this.isPlayerInsideRegion(player)) {
 					enterRegion(region,player);
 				} 
@@ -386,11 +393,19 @@ public class RegionManager {
 				}
 				return;
 			}
+			else if(region.isWorld && !this.isPlayerInsideRegion(player) && region.getWorld().equals(player.getWorld().getName()))
+			{
+				enterRegion(region,player);
+			}
 
 		}
 
 		if(isPlayerInsideRegion(player))
-			exitRegion(player);       
+		{
+			Region r = getRegionForPlayer(player);
+			if(!r.isWorld || (r.isWorld && !player.getWorld().getName().equals(r.getWorld())))
+				exitRegion(player);       
+		}
 
 	}	
 
@@ -473,7 +488,8 @@ public class RegionManager {
 	@SuppressWarnings("deprecation")
 	public void enterRegion(Region r, Player p)
 	{	   
-		plugin.getRewardManager().clear(p);
+		if(!r.isWorld)
+			plugin.getRewardManager().clear(p);
 		if(r.getInventoryModesEnter().contains(InventoryMode.STORE))
 			inventories.put(new PlayerRegion(p.getName(), null), InventoryManager.getInventoryContent(p.getInventory()));
 		else inventories.put(new PlayerRegion(p.getName(), null), InventoryManager.createDummyInventory());
@@ -778,6 +794,17 @@ public class RegionManager {
 	{
 		for(Region reg:getRegions().values())
 			if(reg.contains(l))
+			{
+				return reg;
+			}
+				
+		return getRegionForWorld(l.getWorld());
+	}
+	
+	public Region getRegionForWorld(World w)
+	{
+		for(Region reg:getRegions().values())
+			if(reg.isWorld && reg.getWorld().equals(w.getName()))
 			{
 				return reg;
 			}

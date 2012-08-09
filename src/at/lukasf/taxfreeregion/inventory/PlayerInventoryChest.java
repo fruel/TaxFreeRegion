@@ -271,4 +271,10 @@ public class PlayerInventoryChest implements IInventory
 		// TODO Auto-generated method stub
 		
 	}
+
+	@Override
+	public void startOpen() {
+		// TODO Auto-generated method stub
+		
+	}
 }

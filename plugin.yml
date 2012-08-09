@@ -1,7 +1,7 @@
 main: at.lukasf.taxfreeregion.TaxFreeRegion
-version: 1.5
+version: 1.6
 name: TaxFreeRegion
-author: adreide, tickleman, lukasf
+author: adreide, tickleman, fruel
 depend: [WorldEdit]
 softdepend: [WorldGuard]
 commands:
@@ -11,8 +11,7 @@ commands:
     usage: |
       TaxFreeRegion v1.5
       /<command> list
-      /<command> add [name]
-      /<command> wgadd [name]
+      /<command> add NAME [WorldGuard Region|World]
       /<command> delete
       /<command> reload
       /<command> clear

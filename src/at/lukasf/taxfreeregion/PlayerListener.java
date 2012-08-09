@@ -373,7 +373,7 @@ public class PlayerListener implements Listener
 			if (regionManager.isPlayerInsideRegion(event.getPlayer()))
 			{
 				Region r = regionManager.getRegionForPlayer(event.getPlayer());
-				if(!r.contains(event.getTo()))
+				if((!r.isWorld && !r.contains(event.getTo()) || (r.isWorld && !r.getWorld().equals(event.getTo().getWorld().getName()))))
 					regionManager.exitRegion(event.getPlayer());
 			}
 			Region reg = regionManager.getRegionForLocation(event.getTo());
@@ -441,7 +441,6 @@ public class PlayerListener implements Listener
 		case FULL: return true;
 		case BORDER:
 			Region reg = Region.createDummy(r.getX1()-border, r.getX2()+border, r.getY1()-border, r.getY2()+border, r.getZ1()-border, r.getZ2()+border, r.getWorld());
-			//TaxFreeRegion.log.info("BORDER CHECK: " + r.contains(pos) + " " + reg.contains(pos) +  " " + pos + " *  " + r + " * " + reg);
 			return r.contains(pos) && !reg.contains(pos);
 		}
 		return true;

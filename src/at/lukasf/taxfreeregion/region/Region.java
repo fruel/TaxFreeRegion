@@ -45,7 +45,7 @@ public class Region implements Comparable<Region>{
 	private DenyMode death_drops = DenyMode.NONE;
 	private DenyMode eye_of_ender = DenyMode.NONE;
 	private List<InventoryMode> enterI, exitI;
-	public final boolean isWorldGuard;
+	public final boolean isWorldGuard, isWorld;
 	private List<String> cmdBlacklist, cmdWhitelist;
 	private boolean crossPlace;
 	private List<InventoryMode> xp, health, hunger, xp_exit, health_exit, hunger_exit;	
@@ -64,6 +64,10 @@ public class Region implements Comparable<Region>{
 	}
 	public Region(String name, String world, int x1, int x2, int y1, int y2, int z1, int z2, boolean wg)
 	{
+		this(name,world,x1,x2,y1,y2,z1,z2,wg,false);
+	}
+	public Region(String name, String world, int x1, int x2, int y1, int y2, int z1, int z2, boolean wg, boolean isworld)
+	{
 		isWorldGuard = wg;
 		this.world=world;
 		this.name = name;
@@ -78,6 +82,7 @@ public class Region implements Comparable<Region>{
 		cmdEnter = new ArrayList<Command>();
 		cmdExit = new ArrayList<Command>();
 		permissions = new HashMap<String, Boolean>();
+		this.isWorld = isworld;
 	}
 	
 	public void setInventoryModes(List<InventoryMode> enter, List<InventoryMode> exit)

@@ -40,8 +40,10 @@ import java.util.HashMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Location;
+import org.bukkit.World;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.ConsoleCommandSender;
 import org.bukkit.entity.Player;
@@ -152,6 +154,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 			pw.println("blackListReloaded:%gold%Commands Blacklist reloaded.");
 			pw.println("reward:%gold%Your reward is waiting for you.");
 			pw.println("noReward:%gold%There is no reward for you.");
+			pw.println("error:%gold%Could not create region.");
 			pw.flush();
 			pw.close();
 			log.info("[TaxFreeRegion] Created file messages.properties");
@@ -388,75 +391,33 @@ import org.bukkit.plugin.java.JavaPlugin;
 		   }
 		   if(player.hasPermission("taxfreeregion.use"))
 		   {
-			   StringBuilder sb = new StringBuilder(args[1]);
-			   for (int i = 2; i < args.length; i++) {
-				   sb.append(" ");
-				   sb.append(args[i]);
-			   }
-			   String regionName = sb.toString();
-
-			   if (this.worldEdit == null) {
-				   player.sendMessage(messages.getMessage("noWorldEdit"));
-				   return true;
-			   }
-
-			   if (deleteRegionByName(regionName)) {
-				   player.sendMessage(messages.getMessage("regionOverwriting"));
-			   }
-
-			   Selection sel = this.worldEdit.getSelection(player);
-
-			   if (sel == null) {
-				   player.sendMessage(messages.getMessage("noSelection"));
-				   return true;
-			   }
-
-			   Location max = sel.getMaximumPoint();
-			   Location min = sel.getMinimumPoint();
-
-			   if ((max == null) || (min == null)) {
-				   player.sendMessage(messages.getMessage("selectionIncomplete"));
-				   return true;
-			   }	 
-
-			   region.addRegion(regionName, sel.getWorld().getName(), max.getBlockX(), min.getBlockX(),  max.getBlockY(), min.getBlockY(), max.getBlockZ(), min.getBlockZ());
-
-			   player.sendMessage(messages.getMessage("regionAdded"));
-		   }
-		   else {
-			   player.sendMessage(messages.getMessage("noPermission"));
-		   }
-	   }   
-	   else if ((args.length == 2) && (args[0].equalsIgnoreCase("wgadd")))
-	   {
-		   if(player==null)
-		   {
-			   sender.sendMessage("You are not a player!");
-			   return true;
-		   }
-		   if(player.hasPermission("taxfreeregion.use"))
-		   {
-			   String regionName = args[1];
-			   if (this.worldGuard == null) {
-				   player.sendMessage(messages.getMessage("noWorldGuard"));
-				   return true;
-			   }
-			   if (deleteRegionByName(regionName)) {
-				   player.sendMessage(messages.getMessage("regionOverwriting"));
-			   }
-			   com.sk89q.worldguard.protection.managers.RegionManager rm = this.worldGuard.getRegionManager(player.getWorld());
-			   if(!rm.hasRegion(regionName))
+			   if(args.length < 2 || args.length > 3)
 			   {
-				   player.sendMessage(messages.getMessage("regionNotFound"));
+				   player.sendMessage(messages.getMessage("error"));
 				   return true;
 			   }
-			   region.addRegion(regionName, player.getWorld().getName());
-			   player.sendMessage(messages.getMessage("regionAdded"));
+			   
+			   String name = args[1];
+			   
+			   if (deleteRegionByName(name)) {
+				   player.sendMessage(messages.getMessage("regionOverwriting"));
+			   }
+			   
+			   if(args.length == 2)
+			   {
+				   if(!createRegion(player, name))
+					   player.sendMessage(messages.getMessage("error"));
+				   return true;				   
+			   }
+			   
+			   if(!createRegion(player, name, args[2]))
+				   player.sendMessage(messages.getMessage("error"));
+			   return true;				   
 		   }
 		   else {
 			   player.sendMessage(messages.getMessage("noPermission"));
 		   }
-	   }
+	   }  	  
 	   else if ((args.length == 1) && (args[0].equalsIgnoreCase("list")))
 	   {
 		   if(allowed)
@@ -561,5 +522,68 @@ import org.bukkit.plugin.java.JavaPlugin;
    {
 	   return directory;
    }
-         
+      
+   public boolean createRegion(Player player, String name)
+   {
+	   if (this.worldEdit == null) {
+		   player.sendMessage(messages.getMessage("noWorldEdit"));
+		   return false;
+	   }	   
+
+	   Selection sel = this.worldEdit.getSelection(player);
+
+	   if (sel == null) {
+		   player.sendMessage(messages.getMessage("noSelection"));
+		   return false;
+	   }
+
+	   Location max = sel.getMaximumPoint();
+	   Location min = sel.getMinimumPoint();
+
+	   if ((max == null) || (min == null)) {
+		   player.sendMessage(messages.getMessage("selectionIncomplete"));
+		   return false;
+	   }	 
+
+	   region.addRegion(name, sel.getWorld().getName(), max.getBlockX(), min.getBlockX(),  max.getBlockY(), min.getBlockY(), max.getBlockZ(), min.getBlockZ());
+
+	   player.sendMessage(messages.getMessage("regionAdded"));
+	   
+	   return true;
+   }
+   
+   public boolean createRegion(Player player, String name, String wg)
+   {
+	   if (this.worldGuard == null) {
+		   player.sendMessage(messages.getMessage("noWorldGuard"));
+		   return false;
+	   }
+	   
+	   com.sk89q.worldguard.protection.managers.RegionManager rm = this.worldGuard.getRegionManager(player.getWorld());
+	   if(!rm.hasRegion(wg))
+	   {
+		   World w = Bukkit.getServer().getWorld(wg);
+		   if(w!=null)
+		   {
+			  return createRegion(player, name, w); 
+		   }
+		   else
+		   {
+			   player.sendMessage(messages.getMessage("regionNotFound"));
+			   return false;
+		   }
+	   }
+	   region.addRegion(name, player.getWorld().getName());
+	   player.sendMessage(messages.getMessage("regionAdded"));
+	   
+	   return true;
+   }
+   
+   public boolean createRegion(Player p, String name, World w)
+   {
+	   region.addRegion(name, w);
+	   p.sendMessage(messages.getMessage("regionAdded"));
+	   return true;
+   }
+   
  }
