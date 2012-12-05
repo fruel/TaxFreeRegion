@@ -211,70 +211,41 @@ public class PlayerInventoryChest implements IInventory
         return true;
     }
 
-    public void f()
-    {
+    public void f() {}
 
-    }
+    public void g() {}
 
-    public void g()
-    {
-       /* try
-        {
-            PlayerInventoryChest inv = OpenInvPluginCommand.offlineInv.get(this.Target);
-            if (inv != null)
-            {
-                this.Target.saveData();
-                OpenInvPluginCommand.offlineInv.remove(this.Target);
-            }
-        }
-        catch (Exception e)
-        {}*/
-    }
-
-    public void update()
-    {
-
-    }
+    public void update()  { }
 
 	@Override
 	public InventoryHolder getOwner() {
-		// TODO Auto-generated method stub
 		return null;
 	}
 
 	@Override
 	public List<HumanEntity> getViewers() {
-		// TODO Auto-generated method stub
 		return null;
 	}
 
 	@Override
-	public void onClose(CraftHumanEntity arg0) {
-		// TODO Auto-generated method stub
-		
-	}
+	public void onClose(CraftHumanEntity arg0) {}
 
 	@Override
-	public void onOpen(CraftHumanEntity arg0) {
-		// TODO Auto-generated method stub
-		
-	}
+	public void onOpen(CraftHumanEntity arg0) {}
 
 	@Override
 	public ItemStack splitWithoutUpdate(int arg0) {
-		// TODO Auto-generated method stub
 		return null;
 	}
 
 	@Override
-	public void setMaxStackSize(int arg0) {
-		// TODO Auto-generated method stub
-		
-	}
+	public void setMaxStackSize(int arg0) {}
 
 	@Override
-	public void startOpen() {
-		// TODO Auto-generated method stub
-		
+	public void startOpen() {}
+
+	@Override
+	public boolean a_(EntityHuman arg0) {
+		return false;
 	}
 }

@@ -573,7 +573,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 			   return false;
 		   }
 	   }
-	   region.addRegion(name, player.getWorld().getName());
+	   region.addRegionWG(name, player.getWorld().getName(), wg);
 	   player.sendMessage(messages.getMessage("regionAdded"));
 	   
 	   return true;

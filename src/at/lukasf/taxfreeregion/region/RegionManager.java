@@ -327,9 +327,9 @@ public class RegionManager {
 		addRegion(name, world.getName(), "|none|");				
 	}
 
-	public void addRegion(String name, String world)
+	public void addRegionWG(String name, String world, String wg_name)
 	{		
-		addRegion(name, world, "wg|"+name);				
+		addRegion(name, world, "wg|"+wg_name);				
 	}
 
 	private void addRegion(String name, String world, String region)
