@@ -29,9 +29,10 @@ import java.util.HashMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import org.bukkit.craftbukkit.entity.CraftPlayer;
-import org.bukkit.craftbukkit.inventory.CraftInventory;
+import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.Inventory;
+import org.bukkit.inventory.ItemStack;
 
 import at.lukasf.taxfreeregion.TaxFreeRegion;
 
@@ -65,8 +66,35 @@ public class RewardManager {
 	public void giveMe(Player player) {
 		if(rewards.containsKey(player.getName()))
 		{
-			PlayerInventoryChest inv = new PlayerInventoryChest(rewards.get(player.getName()), player.getName());
-			((CraftPlayer)player).openInventory(new CraftInventory(inv));
+			Inventory inv = Bukkit.getServer().createInventory(player, 45, player.getName());
+			SavedInventory si= rewards.get(player.getName());
+			
+			for (int i = 0; i < si.getSize(); i++){
+				ItemStack is = si.getNewStackFrom(i);
+				if(is != null)
+					inv.addItem(is);				
+			}	        	
+			
+			
+			ItemStack armor;
+			
+			armor = si.getBoots();
+			if(armor != null)
+				inv.addItem(armor);
+			
+			armor = si.getChestplate();
+			if(armor != null)
+				inv.addItem(armor);
+			
+			armor = si.getHelmet();
+			if(armor != null)
+				inv.addItem(armor);
+			
+			armor = si.getLeggings();
+			if(armor != null)
+				inv.addItem(armor);
+						
+			player.openInventory(inv);
 			rewards.remove(player.getName());
 		}
 		else player.sendMessage(TaxFreeRegion.messages.getMessage("noReward"));

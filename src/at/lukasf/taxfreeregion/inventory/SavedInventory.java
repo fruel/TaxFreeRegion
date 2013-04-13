@@ -257,27 +257,6 @@ import at.lukasf.taxfreeregion.TaxFreeRegion;
      }     
      return is; 
    }
-   //CraftItemStack.createNMSItemStack
-   public net.minecraft.server.ItemStack getNewVanillaStackFrom(int index) {
-	     if ((this.typeIds[index] == -1) || (this.typeIds[index] == 0)) {
-	       return null;
-	     }
-	     net.minecraft.server.ItemStack is = new net.minecraft.server.ItemStack(this.typeIds[index], this.quantities[index], this.damageIds[index]);
-	     try{
-	     if(ench.containsKey(index))
-	     {
-	    	 for(Integer id : ench.get(index).keySet())
-	    	 {	    		 
-	    		 is.addEnchantment(net.minecraft.server.Enchantment.byId[id], ench.get(index).get(id).intValue());
-	    	 }
-	     }
-	     }catch(Exception ex)
-	     {
-	    	 TaxFreeRegion.log.log(Level.WARNING, "Enchantment exception: " + ex.getMessage());
-	    	 ex.printStackTrace();
-	     }
-	     return is; 
-	   }
  
    public int getSize()
    {
@@ -306,69 +285,5 @@ import at.lukasf.taxfreeregion.TaxFreeRegion;
  
    public void setTypeIds(int[] typeIds) {
      this.typeIds = typeIds;
-   }
-   
-   public net.minecraft.server.ItemStack getVanillaBoots()
-   {
-	   if(armorIds[0]>0){		   
-		   net.minecraft.server.ItemStack is = new net.minecraft.server.ItemStack(armorIds[0],1,armorDmg[0]);
-		   if(bootsEnch != null && bootsEnchData != null)
-		   {
-			   for(int i = 0; i<bootsEnch.length;i++)
-			   {
-				   is.addEnchantment(net.minecraft.server.Enchantment.byId[bootsEnch[i]], bootsEnchData[i]);
-			   }
-		   }
-		   return is;
-	   }
-	   else return null;
-   }
-   public net.minecraft.server.ItemStack getVanillaChestplate()
-   {
-	   if(armorIds[1]>0)
-	   {
-		   net.minecraft.server.ItemStack is = new net.minecraft.server.ItemStack(armorIds[1],1,armorDmg[1]);
-		   if(chestEnch != null && chestEnchData != null)
-		   {
-			   for(int i = 0; i<chestEnch.length;i++)
-			   {
-				   is.addEnchantment(net.minecraft.server.Enchantment.byId[chestEnch[i]], chestEnchData[i]);
-			   }
-		   }
-		   return is;
-	   }
-	   else return null;
-   }
-   public net.minecraft.server.ItemStack getVanillaHelmet()
-   {
-	   if(armorIds[2]>0)
-	   {
-		   net.minecraft.server.ItemStack is = new net.minecraft.server.ItemStack(armorIds[2],1,armorDmg[2]);
-		   if(headEnch != null && headEnchData != null)
-		   {
-			   for(int i = 0; i<headEnch.length;i++)
-			   {
-				   is.addEnchantment(net.minecraft.server.Enchantment.byId[headEnch[i]], headEnchData[i]);
-			   }
-		   }
-		   return is;
-	   }
-	   else return null;
-   }
-   public net.minecraft.server.ItemStack getVanillaLeggings()
-   {
-	   if(armorIds[3]>0)
-	   {
-		   net.minecraft.server.ItemStack is = new net.minecraft.server.ItemStack(armorIds[3],1,armorDmg[3]);
-		   if(legEnch != null && legEnchData != null)
-		   {
-			   for(int i = 0; i<legEnch.length;i++)
-			   {
-				   is.addEnchantment(net.minecraft.server.Enchantment.byId[legEnch[i]], legEnchData[i]);
-			   }
-		   }
-		   return is;
-	   }
-	   else return null;
-   }
+   }  
  }

@@ -1,5 +1,5 @@
 main: at.lukasf.taxfreeregion.TaxFreeRegion
-version: 1.6.1
+version: 1.6.2
 name: TaxFreeRegion
 author: adreide, tickleman, fruel
 depend: [WorldEdit]
@@ -9,7 +9,7 @@ commands:
     aliases: tf
     description: 'Tax Free Regions Command'
     usage: |
-      TaxFreeRegion v1.5
+      TaxFreeRegion v1.6.1
       /<command> list
       /<command> add NAME [WorldGuard Region|World]
       /<command> delete
