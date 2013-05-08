@@ -76,6 +76,7 @@ public class PlayerListener implements Listener
 		if (regionManager.isPlayerInsideRegion(event.getPlayer()))
 		{
 			Region r = regionManager.getRegionForPlayer(event.getPlayer());
+			Block block = event.getClickedBlock();
 			
 			if (event.getAction().equals(Action.RIGHT_CLICK_BLOCK)  || event.getAction().equals(Action.RIGHT_CLICK_AIR))
 			{
@@ -84,17 +85,28 @@ public class PlayerListener implements Listener
 					event.setCancelled(true);
 					return;
 				}
+				if(event.getItem() != null && event.getItem().getType().equals(Material.HOPPER_MINECART) 
+				   && checkDenyMode(r.getDispenserDenyMode(), (block != null ? block.getLocation() : event.getPlayer().getLocation()), r,7)) {
+					event.setCancelled(true);
+					event.getPlayer().sendMessage(TaxFreeRegion.messages.getMessage("blacklisted"));
+					return;
+				}
+				
 			}
 			if (event.getAction().equals(Action.RIGHT_CLICK_BLOCK))
 			{
-				Block block = event.getClickedBlock();
-				if((block.getType().equals(Material.CHEST) || block.getType().equals(Material.FURNACE)) && checkDenyMode(r.getChestDenyMode(), block.getLocation(), r,5))
+				if((block.getType().equals(Material.CHEST) || block.getType().equals(Material.FURNACE) || 
+					block.getType().equals(Material.TRAPPED_CHEST) || block.getType().equals(Material.ENDER_CHEST) ||
+					block.getType().equals(Material.BREWING_STAND) || block.getType().equals(Material.BEACON)) 
+					&& checkDenyMode(r.getChestDenyMode(), block.getLocation(), r,5))
 				{					
 					event.setCancelled(true);
 					event.getPlayer().sendMessage(TaxFreeRegion.messages.getMessage("blacklisted"));	
 					return;
 				}
-				if(block.getType().equals(Material.DISPENSER) && checkDenyMode(r.getDispenserDenyMode(),block.getLocation(), r,7))
+				if((block.getType().equals(Material.DISPENSER) || block.getType().equals(Material.DROPPER) ||
+					block.getType().equals(Material.HOPPER)) 
+					&& checkDenyMode(r.getDispenserDenyMode(),block.getLocation(), r,7))
 				{					
 					event.setCancelled(true);
 					event.getPlayer().sendMessage(TaxFreeRegion.messages.getMessage("blacklisted"));
