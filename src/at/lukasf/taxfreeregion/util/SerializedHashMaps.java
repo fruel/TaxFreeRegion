@@ -28,12 +28,12 @@ public class SerializedHashMaps implements Serializable{
 	private static final long serialVersionUID = -829296935480224825L;
 	
 	public HashMap<PlayerRegion, SavedInventory> inventories = new HashMap<PlayerRegion, SavedInventory>();
-	public HashMap<PlayerRegion, Integer> healthValues = new HashMap<PlayerRegion, Integer>();
+	public HashMap<PlayerRegion, Double> healthValues = new HashMap<PlayerRegion, Double>();
 	public HashMap<PlayerRegion, IntFloat> xpValues = new HashMap<PlayerRegion, IntFloat>();
 	public HashMap<PlayerRegion, IntFloat> hungerValues = new HashMap<PlayerRegion, IntFloat>();
 	
 	public SerializedHashMaps(HashMap<PlayerRegion, SavedInventory> inventories,
-			HashMap<PlayerRegion, Integer> healthValues,
+			HashMap<PlayerRegion, Double> healthValues,
 			HashMap<PlayerRegion, IntFloat> xpValues,
 			HashMap<PlayerRegion, IntFloat> hungerValues) {
 		this.inventories = inventories;
