@@ -65,7 +65,7 @@ public class RegionManager {
 	private HashMap<String, ArrayList<PermissionAttachment>> perms = new HashMap<String, ArrayList<PermissionAttachment>>();
 	private HashMap<String, OfflineRegion> offline = new HashMap<String, OfflineRegion>();
 	
-	private HashMap<PlayerRegion, Integer> healthValues = new HashMap<PlayerRegion, Integer>();
+	private HashMap<PlayerRegion, Double> healthValues = new HashMap<PlayerRegion, Double>();
 	private HashMap<PlayerRegion, IntFloat> xpValues = new HashMap<PlayerRegion, IntFloat>();
 	private HashMap<PlayerRegion, IntFloat> hungerValues = new HashMap<PlayerRegion, IntFloat>();
 
@@ -535,9 +535,9 @@ public class RegionManager {
 		}
 		if(r.getHealthMode().contains(InventoryMode.RESTORE))
 		{
-			Integer f = healthValues.remove(new PlayerRegion(p.getName(),r.getName()));
-			if(f!=null){
-				p.setHealth(f);				
+			Double d = healthValues.remove(new PlayerRegion(p.getName(),r.getName()));
+			if(d!=null){
+				p.setHealth(d);				
 			}			
 		}
 		if(r.getHealthMode().contains(InventoryMode.CLEAR))
@@ -629,9 +629,9 @@ public class RegionManager {
 			}
 			if(r.getHealthExitMode().contains(InventoryMode.RESTORE))
 			{
-				Integer f = healthValues.remove(new PlayerRegion(p.getName(),null));
-				if(f!=null){
-					p.setHealth(f);						
+				Double d = healthValues.remove(new PlayerRegion(p.getName(),null));
+				if(d!=null){
+					p.setHealth(d);						
 				}			
 			}
 			if(r.getHealthExitMode().contains(InventoryMode.CLEAR))
@@ -660,7 +660,7 @@ public class RegionManager {
 			}
 			
 			//----------------------------------------
-			
+
 			p.updateInventory();
 
 			if(!r.getExitMessage().isEmpty())
@@ -811,7 +811,7 @@ public class RegionManager {
 		return null;
 	}
 
-	public HashMap<PlayerRegion, Integer> getHealthValues() {
+	public HashMap<PlayerRegion, Double> getHealthValues() {
 		return healthValues;
 	}
 
@@ -823,7 +823,7 @@ public class RegionManager {
 		return hungerValues;
 	}
 
-	public void setHealthValues(HashMap<PlayerRegion, Integer> healthValues) {
+	public void setHealthValues(HashMap<PlayerRegion, Double> healthValues) {
 		this.healthValues = healthValues;
 	}
 
