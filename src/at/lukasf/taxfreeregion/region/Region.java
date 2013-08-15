@@ -1,365 +1,350 @@
 /*
-* TaxFreeRegion
-* Copyright (C) 2012 lukasf, adreide, tickleman and contributors
-*
-* This program is free software: you can redistribute it and/or modify
-* it under the terms of the GNU General Public License as published by
-* the Free Software Foundation, either version 3 of the License, or
-* (at your option) any later version.
-*
-* This program is distributed in the hope that it will be useful,
-* but WITHOUT ANY WARRANTY; without even the implied warranty of
-* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-* GNU General Public License for more details.
-*
-* You should have received a copy of the GNU General Public License
-* along with this program. If not, see <http://www.gnu.org/licenses/>.
-*/
+ * TaxFreeRegion
+ * Copyright (C) 2012 lukasf, adreide, tickleman and contributors
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ */
 package at.lukasf.taxfreeregion.region;
 
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
 
 import org.bukkit.Location;
+import org.bukkit.util.BlockVector;
+import org.bukkit.util.Vector;
 
 import at.lukasf.taxfreeregion.util.Command;
 
-public class Region implements Comparable<Region>{
-	
-	private String name;	   
-	private int x1;
-	private int x2;
-	private int y1;
-	private int y2;
-	private int z1;
-	private int z2;
-	private String world;
-	private DenyMode deny_dispenser=DenyMode.NONE;
-	private DenyMode deny_chest = DenyMode.NONE;
-	private DenyMode deny_minecart = DenyMode.NONE;
-	private DenyMode border_piston = DenyMode.NONE;
-	private DenyMode border_block_drop = DenyMode.NONE;
-	private DenyMode item_drops = DenyMode.NONE;
-	private DenyMode death_drops = DenyMode.NONE;
-	private DenyMode eye_of_ender = DenyMode.NONE;
-	private List<InventoryMode> enterI, exitI;
+public class Region {
+
+	public static enum DenyMode { NONE, FULL, BORDER };
+	public static enum InventoryMode { CLEAR, STORE, RESTORE, REWARD };
+
 	public final boolean isWorldGuard, isWorld;
-	private List<String> cmdBlacklist, cmdWhitelist;
+
+	private BlockVector start, end;
+
+	private String name, world;
+	private String enterMessage, exitMessage;
+
 	private boolean crossPlace;
-	private List<InventoryMode> xp, health, hunger, xp_exit, health_exit, hunger_exit;	
-	private List<Command> cmdEnter, cmdExit;
+	private DenyMode denyBlockDrops, denyItemDrops, denyDeathDrops;
+
+	private HashMap<Integer, DenyMode> deniedUse, deniedPlace, deniedRemove;
 	private HashMap<String, Boolean> permissions;
-	private String enter="", exit="";
-	
-	public static Region createDummy(int x1, int x2, int y1, int y2, int z1, int z2, String world)
-	{
-		return new Region("",world,x1, x2, y1, y2, z1, z2, false);
+
+	private List<InventoryMode> inventory, xp, health, hunger;
+	private List<InventoryMode> inventory_exit, xp_exit, health_exit, hunger_exit;
+
+	private List<Command> cmdEnter, cmdExit;
+	private List<String> cmdBlacklist, cmdWhitelist;
+
+	public static Region createDummy(BlockVector point1, BlockVector point2, String world) {
+		return new Region("", world, point1, point2, false);
 	}
-	
-	public Region(String name, String world, int x1, int x2, int y1, int y2, int z1, int z2)
-	{
-		this(name,world,x1,x2,y1,y2,z1,z2,false);
+
+	public Region(String name, String world, BlockVector point1, BlockVector point2) {
+		this(name, world, point1, point2, false);
 	}
-	public Region(String name, String world, int x1, int x2, int y1, int y2, int z1, int z2, boolean wg)
-	{
-		this(name,world,x1,x2,y1,y2,z1,z2,wg,false);
+
+	public Region(String name, String world, BlockVector point1, BlockVector point2, boolean wg) {
+		this(name, world, point1, point2, wg, false);
 	}
-	public Region(String name, String world, int x1, int x2, int y1, int y2, int z1, int z2, boolean wg, boolean isworld)
-	{
-		isWorldGuard = wg;
-		this.world=world;
+
+	public Region(String name, String world, BlockVector point1, BlockVector point2, boolean wg, boolean isworld) {
+		this.isWorldGuard = wg;
+		this.isWorld = isworld;
+		this.world = world;
 		this.name = name;
-		this.x1=x1;
-		this.x2=x2;
-		this.y1=y1;
-		this.y2=y2;
-		this.z1=z1;
-		this.z2=z2;
+
+		crossPlace = false;
+		denyBlockDrops = DenyMode.BORDER;
+		denyItemDrops = DenyMode.FULL;
+		denyDeathDrops = DenyMode.FULL;
+		
+		enterMessage = "";
+		exitMessage = "";
+
+		start = BlockVector.getMinimum(point1, point2).toBlockVector();
+		end = BlockVector.getMaximum(point1, point2).toBlockVector();
+		
 		cmdBlacklist = new ArrayList<String>();
 		cmdWhitelist = new ArrayList<String>();
 		cmdEnter = new ArrayList<Command>();
 		cmdExit = new ArrayList<Command>();
 		permissions = new HashMap<String, Boolean>();
-		this.isWorld = isworld;
+		deniedUse = new HashMap<Integer, DenyMode>();
+		deniedPlace = new HashMap<Integer, DenyMode>();
+		deniedRemove = new HashMap<Integer, DenyMode>();
+
+		inventory = new ArrayList<InventoryMode>();
+		xp = new ArrayList<InventoryMode>();
+		health = new ArrayList<InventoryMode>();
+		hunger = new ArrayList<InventoryMode>();
+
+		inventory_exit = new ArrayList<InventoryMode>();
+		xp_exit = new ArrayList<InventoryMode>();
+		health_exit = new ArrayList<InventoryMode>();
+		hunger_exit = new ArrayList<InventoryMode>();
 	}
 	
-	public void setInventoryModes(List<InventoryMode> enter, List<InventoryMode> exit)
-	{
-		enterI=enter;
-		exitI=exit;
+	public boolean contains(Location loc) {
+		return contains(loc.toVector()) && loc.getWorld().getName().equals(world);
+	}
+
+	public boolean contains(Vector v) {
+		return v.isInAABB(start, end);
 	}
 	
-	public void setDeny(DenyMode deny_dispenser, DenyMode deny_chest, DenyMode deny_minecart, DenyMode border_piston, DenyMode border_block_drop, DenyMode item_drops, DenyMode death_drops, DenyMode eye_of_ender)
-	{
-		this.item_drops = item_drops;
-		this.eye_of_ender = eye_of_ender;
-		this.death_drops = death_drops;
-		this.border_block_drop=border_block_drop;
-		this.border_piston=border_piston;
-		this.deny_chest = deny_chest;
-		this.deny_dispenser = deny_dispenser;
-		this.deny_minecart=deny_minecart;
+	public boolean contains(int x, int y, int z) {
+		return new Vector(x, y, z).isInAABB(start, end);
 	}
-	public void setMessages(String enter, String exit)
-	{
-		this.enter=enter;
-		this.exit=exit;
+
+	public boolean isCommandBlackListed(String command) {
+		for (String cmd : cmdBlacklist) {
+			if (command.startsWith(cmd + " ") || command.equals(cmd))
+				return true;
+		}
+		return false;
 	}
-	public String getWorld()
-	{
-		return world;
-	}
-	public DenyMode getDispenserDenyMode()
-	{
-		return deny_dispenser;
-	}
-	public DenyMode getChestDenyMode()
-	{
-		return deny_chest;
-	}
-	public DenyMode getStorageMinecartDenyMode()
-	{
-		return deny_minecart;
-	}
-	public String getName()
-    {
-     return this.name;
-    }
- 
-   public void setName(String name) {
-     this.name = name;
-   }
- 
-   public int getX1() {
-     return this.x1;
-   }
- 
-   public void setX1(int x1) {
-     this.x1 = x1;
-   }
- 
-   public int getX2()
-   {
-     return this.x2;
-   }
- 
-   public void setX2(int x2) {
-     this.x2 = x2;
-   }
- 
-   public int getY1()
-   {
-     return this.y1;
-   }
- 
-   public void setY1(int y1) {
-     this.y1 = y1;
-   }
- 
-   public int getY2()
-   {
-     return this.y2;
-   }
- 
-   public void setY2(int y2) {
-     this.y2 = y2;
-   }
- 
-   public int getZ1()
-   {
-     return this.z1;
-   }
- 
-   public void setZ1(int z1) {
-     this.z1 = z1;
-   }
- 
-   public int getZ2()
-   {
-     return this.z2;
-   }
- 
-   public void setZ2(int z2) {
-     this.z2 = z2;
-   }
- 
-   public String toString()
-   {
-     return String.format("[%s] (%d, %d, %d) (%d, %d, %d)", new Object[] { this.name, Integer.valueOf(this.x1), Integer.valueOf(this.y1), Integer.valueOf(this.z1), Integer.valueOf(this.x2), Integer.valueOf(this.y2), Integer.valueOf(this.z2) });
-   }
- 
-   public boolean contains(Location loc)
-   {
-     int x = loc.getBlockX();
-     int y = loc.getBlockY();
-     int z = loc.getBlockZ();
- 
-     return contains(x,y,z) && loc.getWorld().getName().equals(world);
-   }
- 
-   public boolean contains(int x, int y, int z) {
-     return (x >= this.x2) && (x <= this.x1) && (z >= this.z2) && (z <= this.z1) && (y >= this.y2) && (y <= this.y1);
-   }
- 
-   public int compareTo(Region o)
-   {
-     if (o.x1 > this.x1)
-       return 1;
-     if (o.x1 == this.x1)
-     {
-       if (o.z1 > this.z1)
-         return 1;
-       if (o.z1 == this.z1)
-       {
-         if (o.y1 > this.y1)
-           return 1;
-         if (o.y1 == this.y1) {
-           return 0;
-         }
-       }
-     }
- 
-     return -1;
-   }
-	public List<String> getCommandBlacklist() {
-		return cmdBlacklist;
-	}
-	public void setCommandBlacklist(List<String> cmdBlacklist) {
-		this.cmdBlacklist = cmdBlacklist;
-	}
-	public List<String> getCommandWhitelist() {
-		return cmdWhitelist;
-	}
-	public void setCommandWhitelist(List<String> cmdWhitelist) {
-		this.cmdWhitelist = cmdWhitelist;
-	}
-	public List<Command> getCommandsEnter() {
-		return cmdEnter;
-	}
-	public void setCommandsEnter(List<Command> cmdEnter) {
-		this.cmdEnter = cmdEnter;
-	}
-	public List<Command> getCommandsExit() {
-		return cmdExit;
-	}
-	public void setCommandsExit(List<Command> cmdExit) {
-		this.cmdExit = cmdExit;
-	}
-	public HashMap<String, Boolean> getPermissions() {
-		return permissions;
-	}
-	public void setPermissions(HashMap<String, Boolean> permissions) {
-		this.permissions = permissions;
-	}
-	public boolean isCommandBlackListed(String command)
-   {
-     for(String cmd : cmdBlacklist)
-     {
-    	 if(command.startsWith(cmd)) return true;
-     }
-     return false;
-   }
-   public boolean isCommandWhiteListed(String command)
-   {
-     Iterator<String> it = this.cmdWhitelist.iterator();
- 
-     while (it.hasNext()) {
-       String itEquals = (String)it.next();
-       String itWithParams = itEquals + " ";
-       if ((command.startsWith(itWithParams)) || (command.equals(itEquals))) {
-         return true;
-       }
-     }
-     return false;
-   }
+
+	public boolean isCommandWhiteListed(String command) {
+		for (String cmd : cmdWhitelist) {
+			if (command.startsWith(cmd + " ") || command.equals(cmd))
+				return true;
+		}
+		return false;
+	}	
 	
-	public DenyMode getPistonDenyMode() {
-		return border_piston;
+	/* SETTER */
+	
+	public void setDenyBlockDrops(DenyMode denyBlockDrops) {
+		this.denyBlockDrops = denyBlockDrops;
 	}
-	public DenyMode getBlockDropDenyMode() {
-		return border_block_drop;
-	}
-	public DenyMode getItemDropsDenyMode() {
-		return item_drops;
-	}
-	public DenyMode getDeathDropsDenyMode() {
-		return death_drops;
-	}
-	public DenyMode getEyeOfEnderDenyMode() {
-		return eye_of_ender;
-	}
-	public String getEnterMessage() {
-		return enter;
-	}
-	public String getExitMessage() {
-		return exit;
+
+	public void setDenyItemDrops(DenyMode denyItemDrops) {
+		this.denyItemDrops = denyItemDrops;
+	}	
+
+	public void setDenyDeathDrops(DenyMode denyDeathDrops) {
+		this.denyDeathDrops = denyDeathDrops;
 	}
 	
-	public List<InventoryMode> getInventoryModesEnter() {
-		return enterI;
+	public void setName(String name) {
+		this.name = name;
 	}
-	public List<InventoryMode> getInventoryModesExit() {
-		return exitI;
-	}
-
-	public List<InventoryMode> getXpMode() {
-		return xp;
+	
+	public void setEnterMessage(String enter) {
+		enterMessage = enter;
 	}
 
-	public void setXpMode(List<InventoryMode> xp) {
-		this.xp = xp;
+	public void setExitMessage(String exit) {
+		exitMessage = exit;
 	}
-
-	public List<InventoryMode> getHealthMode() {
-		return health;
-	}
-
-	public void setHealthMode(List<InventoryMode> health) {
-		this.health = health;
-	}
-
-	public List<InventoryMode> getHungerMode() {
-		return hunger;
-	}
-
-	public void setHungerMode(List<InventoryMode> hunger) {
-		this.hunger = hunger;
-	}
-
-	public boolean isCrossPlacingDenyed() {
-		return !crossPlace;
-	}
-
+	
 	public void setCrossPlacing(boolean crossPlace) {
 		this.crossPlace = crossPlace;
 	}
 	
-	public List<InventoryMode> getXpExitMode() {
-		return xp_exit;
+	/* ADD-Methods */
+	
+	public void addPermission(String permission, boolean value) {
+		permissions.put(permission, value);
+	}
+	
+	public void addBlacklistedCommand(String cmd) {
+		cmdBlacklist.add(cmd);
+	}
+	
+	public void addWhitelistedCommand(String cmd) {
+		cmdWhitelist.add(cmd);
 	}
 
-	public void setXpExitMode(List<InventoryMode> xp_exit) {
-		this.xp_exit = xp_exit;
+	public void addEnterInventoryMode(InventoryMode mode) {
+		if (!inventory.contains(mode)) {
+			inventory.add(mode);
+		}
 	}
 
-	public List<InventoryMode> getHealthExitMode() {
-		return health_exit;
+	public void addExitInventoryMode(InventoryMode mode) {
+		if (!inventory_exit.contains(mode)) {
+			inventory_exit.add(mode);
+		}
 	}
 
-	public void setHealthExitMode(List<InventoryMode> health_exit) {
-		this.health_exit = health_exit;
+	public void addUsageDeniedItem(int blockid, DenyMode mode) {
+		deniedUse.put(blockid, mode);
+	}
+	
+	public void addPlaceDeniedItem(int blockid, DenyMode mode) {
+		deniedPlace.put(blockid, mode);
+	}
+	
+	public void addRemoveDeniedItem(int blockid, DenyMode mode) {
+		deniedRemove.put(blockid, mode);
+	}
+	
+	public void addEnterCommand(Command cmd) {
+		cmdEnter.add(cmd);
+	}
+	
+	public void addExitCommand(Command cmd) {
+		cmdExit.add(cmd);
+	}
+	
+	public void addEnterXpMode(InventoryMode mode) {
+		xp.add(mode);
+	}
+	
+	public void addEnterHealthMode(InventoryMode mode) {
+		health.add(mode);
+	}
+	
+	public void addEnterHungerMode(InventoryMode mode) {
+		hunger.add(mode);
+	}	
+	
+	public void addExitXpMode(InventoryMode mode) {
+		xp_exit.add(mode);
+	}
+	
+	public void addExitHealthMode(InventoryMode mode) {
+		health_exit.add(mode);
+	}
+	
+	public void addExitHungerMode(InventoryMode mode) {
+		hunger_exit.add(mode);
+	}
+	
+	/* GETTER */
+	
+	public boolean isCrossPlacingDenyed() {
+		return !crossPlace;
+	}
+	
+	public DenyMode isBlockDropsDenied() {
+		return denyBlockDrops;
+	}
+	
+	public DenyMode isItemDropsDenied() {
+		return denyItemDrops;
+	}
+	
+	public DenyMode isDeathDropsDenied() {
+		return denyDeathDrops;
+	}
+	
+	public String getName() {
+		return this.name;
+	}
+	
+	public String getWorld() {
+		return world;
 	}
 
-	public List<InventoryMode> getHungerExitModet() {
-		return hunger_exit;
+	public DenyMode getUsageDenyMode(int blockid) {
+		if (deniedUse.containsKey(blockid)) {
+			return deniedUse.get(blockid);
+		}
+
+		return DenyMode.NONE;
+	}
+	
+	public DenyMode getPlaceDenyMode(int blockid) {
+		if (deniedPlace.containsKey(blockid)) {
+			return deniedPlace.get(blockid);
+		}
+
+		return DenyMode.NONE;
+	}
+	
+	public DenyMode getRemoveDenyMode(int blockid) {
+		if (deniedRemove.containsKey(blockid)) {
+			return deniedRemove.get(blockid);
+		}
+
+		return DenyMode.NONE;
 	}
 
-	public void setHungerExitMode(List<InventoryMode> hunger_exit) {
-		this.hunger_exit = hunger_exit;
+	public BlockVector getLowerEdge() {
+		return start.clone();
 	}
 
+	public BlockVector getUpperEdge() {
+		return end.clone();
+	}
+	
+	public List<Command> getEnterCommands() {
+		return cmdEnter;
+	}
+	
+	public List<Command> getExitCommands() {
+		return cmdEnter;
+	}
+
+	public HashMap<String, Boolean> getPermissions() {
+		return permissions;
+	}
+	
+	public String getEnterMessage() {
+		return enterMessage;
+	}
+
+	public String getExitMessage() {
+		return exitMessage;
+	}
+
+	public boolean hasInventoryEnterMode(InventoryMode i) {
+		return inventory.contains(i);
+	}
+
+	public boolean hasInventoryExitMode(InventoryMode i) {
+		return inventory_exit.contains(i);
+	}
+
+	public boolean hasXpEnterMode(InventoryMode i) {
+		return xp.contains(i);
+	}
+	
+	public boolean hasHealthEnterMode(InventoryMode i) {
+		return health.contains(i);
+	}
+	
+	public boolean hasHungerEnterMode(InventoryMode i) {
+		return hunger.contains(i);
+	}
+	
+	public boolean hasXpExitMode(InventoryMode i) {
+		return xp_exit.contains(i);
+	}
+	
+	public boolean hasHealthExitMode(InventoryMode i) {
+		return health_exit.contains(i);
+	}
+	
+	public boolean hasHungerExitMode(InventoryMode i) {
+		return hunger_exit.contains(i);
+	}
+
+	/* OVERRIDES */
+	
+	@Override
+	public String toString() {
+		return String.format("[%s] (%d, %d, %d) (%d, %d, %d)", name, start.getBlockX(), start.getBlockY(), start.getBlockZ(), end.getBlockX(), end.getBlockY(), end.getBlockZ());
+	}
+	
 	@Override
 	public int hashCode() {
 		final int prime = 31;
@@ -384,7 +369,4 @@ public class Region implements Comparable<Region>{
 			return false;
 		return true;
 	}
-
-	public static enum DenyMode { NONE, FULL, BORDER};
-    public static enum InventoryMode {CLEAR, STORE, RESTORE, REWARD};
 }

@@ -18,6 +18,7 @@
 package at.lukasf.taxfreeregion;
  
 import at.lukasf.taxfreeregion.inventory.RewardManager;
+import at.lukasf.taxfreeregion.inventory.SavedInventory;
 import at.lukasf.taxfreeregion.region.OfflineRegion;
 import at.lukasf.taxfreeregion.region.Region;
 import at.lukasf.taxfreeregion.region.RegionManager;
@@ -35,9 +36,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
-import java.io.PrintWriter;
 import java.util.HashMap;
-import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import org.bukkit.Bukkit;
@@ -50,540 +49,458 @@ import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.PluginManager;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.util.BlockVector;
  
- public class TaxFreeRegion extends JavaPlugin
- {
-   private PlayerListener playerListener;
-   public static final Logger log = Logger.getLogger("Minecraft");
-   public static Messages messages = new Messages();
-   private boolean eventRegistered = false;
-   
-   private WorldEditPlugin worldEdit;
-   private WorldGuardPlugin worldGuard;
-      
-   private RegionManager region;
-   private File inventoryFile, directory, offlineregions;
-   
-   private RewardManager rewards;
-   
-   public void onEnable()
-   {			  
-	  if (!this.isWorldEditSet()) {
-	       Plugin worldEdit = this.getServer().getPluginManager().getPlugin("WorldEdit");
-	       if ((worldEdit != null) && 
-	         (worldEdit.isEnabled())) {
-	         this.setWorldEdit((WorldEditPlugin)worldEdit);
-	         TaxFreeRegion.log.log(Level.INFO, "[TaxFreeRegion] Successfully linked with WorldEdit.");
-	       }
-	     }
-	     
-	     if (!this.isWorldGuardSet()) {
-	         Plugin worldGuard = this.getServer().getPluginManager().getPlugin("WorldGuard");
-	         if ((worldGuard != null) && 
-	           (worldGuard.isEnabled())) {
-	           this.setWorldGuard((WorldGuardPlugin)worldGuard);
-	           TaxFreeRegion.log.log(Level.INFO, "[TaxFreeRegion] Successfully linked with WorldGuard.");
-	         }
-	     }
-	  
-     try
-     {
-       directory = new File("./plugins/TaxFreeRegion");
-       if (!directory.exists()) {
-         directory.mkdirs();
-       } 
-       
-       this.inventoryFile = new File(directory, "inventories.ser");
-       if ((!this.inventoryFile.exists()) || (!this.inventoryFile.isFile())) {
-         this.inventoryFile.createNewFile();
-         log.info("[TaxFreeRegion] Created file inventories.ser");
-       }        
-       
-       this.offlineregions = new File(directory, "offlineregion.ser");
-       if ((!this.offlineregions.exists()) || (!this.offlineregions.isFile())) {
-         this.offlineregions.createNewFile();
-         log.info("[TaxFreeRegion] Created file offlineregion.ser");
-       } 
-       
-       File msgFile = new File(directory, "messages.properties");
-       if ((!msgFile.exists()) || (!msgFile.isFile())) {
-         msgFile.createNewFile();
-         writeDefaultMessages();
-       } 
-       messages.loadMessages(msgFile);
-       
-       region = new RegionManager(this);
-       rewards = new RewardManager(this);
-       playerListener = new PlayerListener(this);
-     }
-     catch (IOException ex) {
-       log.log(Level.SEVERE, "[TaxFreeRegion] : Error on Region File");
-       return;
-     }
- 
-     if (!this.eventRegistered) {
-       PluginManager pm = getServer().getPluginManager();
-       pm.registerEvents(playerListener, this);
-       
-       this.eventRegistered = true;
-     }
-     
-     loadInventories();
-     loadOfflineRegions();
-     
-     log.log(Level.INFO, "[TaxFreeRegion] Version " + getDescription().getVersion() + " is enabled!");
-   }
-      
-   private void writeDefaultMessages() {
-		try {
-			PrintWriter pw = new PrintWriter(new FileOutputStream("./plugins/TaxFreeRegion/messages.properties"));
-			pw.println("noPermission:%red%You don't have the permissions");
-			pw.println("noWorldEdit:%red%WorldEdit isn't loaded. Please use WorldEdit to make selections!");
-			pw.println("noWorldGuard:%red%WorldGuard not found! You need WorldGuard to use this feature!");
-			pw.println("regionOverwriting:%red%There is already a region with that name, overwriting...");
-			pw.println("noSelection:%red%You must do a selection with WorldEdit to define a region.");
-			pw.println("selectionIncomplete:%red%You have to have two points to have a valid selection!");
-			pw.println("noRegion:%red%There is no such region.");
-			pw.println("blacklisted:%red%You cannot use that command");
-			pw.println("whitelisted:%red%You cannot use that command here");
-			pw.println("regionAdded:%gold%Region added. Configure the region in regions.yml then run /tf reload.");
-			pw.println("regionDeleted:%gold%Region deleted.");
-			pw.println("regionNotFound:%gold%Couldn not find the specified WorldGuard region..");
-			pw.println("reload:%gold%Regions reloaded.");
-			pw.println("reset:%gold%TaxFreeRegion has been reset.");
-			pw.println("blackListReloaded:%gold%Commands Blacklist reloaded.");
-			pw.println("reward:%gold%Your reward is waiting for you.");
-			pw.println("noReward:%gold%There is no reward for you.");
-			pw.println("error:%gold%Could not create region.");
-			pw.flush();
-			pw.close();
-			log.info("[TaxFreeRegion] Created file messages.properties");
-		} catch (Exception e) {
-			e.printStackTrace();
+public class TaxFreeRegion extends JavaPlugin {
+	public static final Logger log = Logger.getLogger("Minecraft");
+	public static final File baseDirectory = new File("./plugins/TaxFreeRegion");
+		
+	private PlayerListener playerListener;
+	private boolean eventRegistered = false;
+
+	private WorldEditPlugin worldEdit;
+	private WorldGuardPlugin worldGuard;
+
+	private RegionManager region;
+	private RewardManager rewards;
+	
+	private Messages messages;
+	
+	private File inventoryFile, offlineregions, rewardFile;
+
+	public void onEnable() {
+		if (!this.isWorldEditSet()) {
+			Plugin worldEdit = this.getServer().getPluginManager().getPlugin("WorldEdit");
+			
+			if (worldEdit != null && worldEdit.isEnabled()) {
+				this.worldEdit = (WorldEditPlugin) worldEdit;
+				log.info("[TaxFreeRegion] Successfully linked with WorldEdit.");
+			}
+		}
+
+		if (!this.isWorldGuardSet()) {
+			Plugin worldGuard = this.getServer().getPluginManager().getPlugin("WorldGuard");
+			
+			if (worldGuard != null && worldGuard.isEnabled()) {
+				this.worldGuard = (WorldGuardPlugin) worldGuard;
+				log.info("[TaxFreeRegion] Successfully linked with WorldGuard.");
+			}
 		}
 		
+		if (!baseDirectory.exists()) {
+			baseDirectory.mkdirs();
+		}
 		
+		messages = new Messages("messages.properties");
+
+		region = new RegionManager(this);
+		rewards = new RewardManager(this);
+
+		try {
+			this.inventoryFile = new File(baseDirectory, "inventories.ser");
+			if (!this.inventoryFile.exists() || !this.inventoryFile.isFile()) {
+				this.inventoryFile.createNewFile();
+				log.info("[TaxFreeRegion] Created file inventories.ser");
+			}
+
+			this.offlineregions = new File(baseDirectory, "offlineregion.ser");
+			if (!this.offlineregions.exists() || !this.offlineregions.isFile()) {
+				this.offlineregions.createNewFile();
+				log.info("[TaxFreeRegion] Created file offlineregion.ser");
+			}
+			
+			this.rewardFile = new File(baseDirectory, "rewards.ser");
+			if (!this.rewardFile.exists() || !this.rewardFile.isFile()) {
+				this.rewardFile.createNewFile();
+				log.info("[TaxFreeRegion] Created file rewards.ser");
+			}
+			
+			loadInventories();
+			loadOfflineRegions();
+			loadRewards();
+			
+		} catch (IOException ex) {
+			log.severe("[TaxFreeRegion] Error in data files.");
+			return;
+		}
+		
+		playerListener = new PlayerListener(this);
+
+		if (!this.eventRegistered) {
+			PluginManager pm = getServer().getPluginManager();
+			pm.registerEvents(playerListener, this);
+
+			this.eventRegistered = true;
+		}
+		
+		log.info("[TaxFreeRegion] Version " + getDescription().getVersion() + " is enabled!");
 	}
 
-   public void onDisable()
-   {	
-	 region.cleanShutdown();
-	 
-	 saveInventories();
-	 saveOfflineRegions();
-	 
-     rewards.cleanShutdown();
-     log.log(Level.INFO, "[TaxFreeRegion] is disabled!");
-   }
- 
-   public WorldEditPlugin getWorldEdit() {
-     return this.worldEdit;
-   }
- 
-   public void setWorldEdit(WorldEditPlugin worldEdit) {
-     this.worldEdit = worldEdit;
-   }
- 
-   public boolean isWorldEditSet() {
-     return this.worldEdit != null;
-   }
-   public WorldGuardPlugin getWorldGuard() {
-     return this.worldGuard;
-   }
- 
-   public void setWorldGuard(WorldGuardPlugin worldGuard) {
-     this.worldGuard = worldGuard;
-   }
- 
-   public boolean isWorldGuardSet() {
-     return this.worldGuard != null;
-   }
-   
-   private void loadInventories()
-   {
-     ObjectInputStream ois = null;
-     try
-     {
-       ois = new ObjectInputStream(new FileInputStream(this.inventoryFile));
- 
-       SerializedHashMaps m = (SerializedHashMaps)ois.readObject();
-       region.setInventories(m.inventories);
-       region.setHealthValues(m.healthValues);
-       region.setHungerValues(m.hungerValues);
-       region.setXpValues(m.xpValues);
-     }
-     catch (EOFException ex) {
- 
-       if (ois != null)
-         try {
-           ois.close();
-         } catch (IOException ex2) {
-           log.log(Level.WARNING, "[TaxFreeRegion] Inventory file error on close !");
-         }
-     }
-     catch (Exception ex)
-     {
-       log.log(Level.WARNING, "[TaxFreeRegion] Inventories file error !");
-       ex.printStackTrace();
- 
-       if (ois != null)
-         try {
-           ois.close();
-         } catch (IOException ex3) {
-           log.log(Level.WARNING, "[TaxFreeRegion] Inventory file error on close !");
-         }
-     }
-     finally
-     {
-       if (ois != null)
-         try {
-           ois.close();
-         } catch (IOException ex) {
-           log.log(Level.WARNING, "[TaxFreeRegion] Inventory file error on close !");
-         }
-     }
-   }
- 
-   private void saveInventories()
-   {
-     ObjectOutputStream oos = null;
-     try {
-       oos = new ObjectOutputStream(new FileOutputStream(inventoryFile));
- 
-       oos.writeObject(new SerializedHashMaps(region.getInventories(), region.getHealthValues(), region.getXpValues(), region.getHungerValues()));
-     } catch (Exception ex) {
-       log.log(Level.SEVERE, "[TaxFreeRegion] Inventory file not saved !");
- 
-       if (oos != null)
-         try {
-           oos.close();
-         } catch (IOException ex2) {
-           log.log(Level.WARNING, "[TaxFreeRegion] Inventory file error on close !");
-         }
-     }
-     finally
-     {
-       if (oos != null)
-         try {
-           oos.close();
-         } catch (IOException ex) {
-           log.log(Level.WARNING, "[TaxFreeRegion] Inventory file error on close !");
-         }
-     }
-   }   
-  
-   @SuppressWarnings("unchecked")
-   private void loadOfflineRegions()
-   {
-     ObjectInputStream ois = null;
-     try
-     {
-       ois = new ObjectInputStream(new FileInputStream(offlineregions));
- 
-       region.setOfflinePlayers(((HashMap<String, OfflineRegion>)ois.readObject()));
-     }
-     catch (EOFException ex) {
-       
-    	if (ois != null)
-         try {
-           ois.close();
-         } catch (IOException ex2) {
-           log.log(Level.WARNING, "[TaxFreeRegion] Inventory file error on close !");
-         }
-     }
-     catch (Exception ex)
-     {
-       log.log(Level.WARNING, "[TaxFreeRegion] Inventories file error !");
-       ex.printStackTrace();       
- 
-       if (ois != null)
-         try {
-           ois.close();
-         } catch (IOException ex3) {
-           log.log(Level.WARNING, "[TaxFreeRegion] Inventory file error on close !");
-         }
-     }
-     finally
-     {
-       if (ois != null)
-         try {
-           ois.close();
-         } catch (IOException ex) {
-           log.log(Level.WARNING, "[TaxFreeRegion] Inventory file error on close !");
-         }
-     }
-   }
- 
-   private void saveOfflineRegions()
-   {
-     ObjectOutputStream oos = null;
-     try {
-       oos = new ObjectOutputStream(new FileOutputStream(offlineregions));
- 
-       oos.writeObject(region.getOfflinePlayers());
-     } catch (Exception ex) {
-       log.log(Level.SEVERE, "[TaxFreeRegion] Inventory file not saved !");
- 
-       if (oos != null)
-         try {
-           oos.close();
-         } catch (IOException ex2) {
-           log.log(Level.WARNING, "[TaxFreeRegion] Inventory file error on close !");
-         }
-     }
-     finally
-     {
-       if (oos != null)
-         try {
-           oos.close();
-         } catch (IOException ex) {
-           log.log(Level.WARNING, "[TaxFreeRegion] Inventory file error on close !");
-         }
-     }
-   }   
-   
-   public boolean onCommand(CommandSender sender, org.bukkit.command.Command command, String label, String[] args)
-   {
-	   if (args.length < 1) {
-		   return false;
-	   }
+	public void onDisable() {
+		region.cleanShutdown();
 
-	   Player player=null;
+		saveInventories();
+		saveOfflineRegions();
+		saveRewards();
+		
+		log.info("[TaxFreeRegion] is disabled!");
+	}
 
-	   if (sender instanceof Player)
-	   {
-		   player = (Player)sender;		   
-	   }
+	public boolean onCommand(CommandSender sender, org.bukkit.command.Command command, String label, String[] args) {
+		if (args.length < 1) {
+			return false;
+		}
 
-	   boolean allowed = (player != null && player.hasPermission("taxfreeregion.use"))|| sender instanceof ConsoleCommandSender;
+		Player player = null;
 
-	  if (args.length == 1 && args[0].equalsIgnoreCase("clear"))
-	   {
-		  if(player==null)
-		   {
-			   sender.sendMessage("You are not a player!");
-			   return true;
-		   }
-		   if (player.hasPermission("taxfreeregion.clear") && region.isPlayerInsideRegion(player))
-		   {
-			   player.getInventory().clear();
-		   }
-		   else
-		   {
-			   player.sendMessage(messages.getMessage("noPermission"));
-		   }
-	   }
-	   else if(args.length == 1 && args[0].equalsIgnoreCase("reward"))
-	   {
-		   if(player==null)
-		   {
-			   sender.sendMessage("You are not a player!");
-			   return true;
-		   }
-		   rewards.giveMe(player);
-	   }
-	   else if ((args.length >= 2) && (args[0].equalsIgnoreCase("add")))
-	   {
-		   if(player==null)
-		   {
-			   sender.sendMessage("You are not a player!");
-			   return true;
-		   }
-		   if(player.hasPermission("taxfreeregion.use"))
-		   {
-			   if(args.length < 2 || args.length > 3)
-			   {
-				   player.sendMessage(messages.getMessage("error"));
-				   return true;
-			   }
-			   
-			   String name = args[1];
-			   
-			   if (deleteRegionByName(name)) {
-				   player.sendMessage(messages.getMessage("regionOverwriting"));
-			   }
-			   
-			   if(args.length == 2)
-			   {
-				   if(!createRegion(player, name))
-					   player.sendMessage(messages.getMessage("error"));
-				   return true;				   
-			   }
-			   
-			   if(!createRegion(player, name, args[2]))
-				   player.sendMessage(messages.getMessage("error"));
-			   return true;				   
-		   }
-		   else {
-			   player.sendMessage(messages.getMessage("noPermission"));
-		   }
-	   }  	  
-	   else if ((args.length == 1) && (args[0].equalsIgnoreCase("list")))
-	   {
-		   if(allowed)
-		   {
-			   HashMap<String, Region> regions = region.getRegions();
-			   if (regions.isEmpty())
-			   {
-				   sender.sendMessage(messages.getMessage("noRegion"));
-				   return true;
-			   }
+		if (sender instanceof Player) {
+			player = (Player) sender;
+		}
 
-			   for(String s:regions.keySet())
-			   {
-				   Region r = regions.get(s);
-				   sender.sendMessage(ChatColor.GOLD + s + ChatColor.GREEN+" ["+r.getX2() + ", " + r.getY2() + ", "+r.getZ2() + "]["+r.getX1() + ", " + r.getY1() + ", "+r.getZ1() + "] "+ChatColor.DARK_GREEN+"["+regions.get(s).getWorld() + "] "+(regions.get(s).isWorldGuard?ChatColor.RED+"[WorldGuard]":""));
-			   }
-		   }
-		   else {
-			   sender.sendMessage(messages.getMessage("noPermission"));
-		   }
-	   }
-	   else if ((args.length > 1) && (args[0].equalsIgnoreCase("delete")))
-	   {
-		   if(allowed)
-		   {
-			   StringBuilder sb = new StringBuilder(args[1]);
-			   for (int i = 2; i < args.length; i++) 
-			   {
-				   sb.append(" ");
-				   sb.append(args[i]);
-			   }
-			   String regionName = sb.toString();
+		boolean allowed = (player != null && player.hasPermission("taxfreeregion.use"))	|| sender instanceof ConsoleCommandSender;
 
-			   if (!deleteRegionByName(regionName)) 
-			   {
-				   sender.sendMessage(messages.getMessage("noRegion"));
-				   return true;
-			   }
+		if (args.length == 1 && args[0].equalsIgnoreCase("clear")) {
+			if (player == null) {
+				sender.sendMessage("You are not a player!");
+				return true;
+			}
+			if (player.hasPermission("taxfreeregion.clear")	&& region.isPlayerInsideRegion(player)) {
+				player.getInventory().clear();
+			} else {
+				player.sendMessage(messages.getMessage("noPermission"));
+			}
+		} 
+		else if (args.length == 1 && args[0].equalsIgnoreCase("reward")) {
+			if (player == null) {
+				sender.sendMessage("You are not a player!");
+				return true;
+			}
+			rewards.giveMe(player);
+		} 
+		else if (args.length >= 2 && args[0].equalsIgnoreCase("add")) {
+			if (player == null) {
+				sender.sendMessage("You are not a player!");
+				return true;
+			}
+			if (player.hasPermission("taxfreeregion.use")) {
+				if (args.length < 2 || args.length > 3) {
+					player.sendMessage(messages.getMessage("error"));
+					return true;
+				}
 
-			   sender.sendMessage(messages.getMessage("regionDeleted"));	 
-		   }
-		   else {
-			   sender.sendMessage(messages.getMessage("noPermission"));
-		   }	     
-	   } 
-	   else if ((args.length == 1) && (args[0].equalsIgnoreCase("reload"))) {
+				String name = args[1];
 
-		   if(allowed)
-		   {
-			   region.loadConfig();	 		   
-			   sender.sendMessage(messages.getMessage("reload"));
-		   }
-		   else {
-			   sender.sendMessage(messages.getMessage("noPermission"));
-		   }	
-	   }
-	   else if ((args.length == 1) && (args[0].equalsIgnoreCase("reset"))) {
+				if (deleteRegionByName(name)) {
+					player.sendMessage(messages.getMessage("regionOverwriting"));
+				}
 
-		   if(allowed)
-		   {
-			   inventoryFile.delete();
-			   offlineregions.delete();
-			   region.reset();
-			   region.loadConfig();	
-			   rewards.clear();
-			   rewards.clean();
-			   sender.sendMessage(messages.getMessage("reset"));
-		   }
-		   else {
-			   sender.sendMessage(messages.getMessage("noPermission"));
-		   }	
-	   } 
-	   else{
-		   return false;
-	   }  
-	   
-	   return true;
-   }    
- 
-   private boolean deleteRegionByName(String name) {
-    Region r = region.getRegionByName(name);
-    if(r!=null)
-    {
-    	region.deleteRegion(r);
-    	return true;
-    }
-     return false;
-   }
-    
-   
-   public RegionManager getRegionManager()
-   {
-	   return region;
-   }
-   
-   public RewardManager getRewardManager()
-   {
-	   return rewards;
-   }
-   
-   public File getConfigDirectory()
-   {
-	   return directory;
-   }
-      
-   public boolean createRegion(Player player, String name)
-   {
-	   if (this.worldEdit == null) {
-		   player.sendMessage(messages.getMessage("noWorldEdit"));
-		   return false;
-	   }	   
+				if (args.length == 2) {
+					if (!createRegion(player, name)) {
+						player.sendMessage(messages.getMessage("error"));
+					}
+					return true;
+				}
 
-	   Selection sel = this.worldEdit.getSelection(player);
+				if (!createRegion(player, name, args[2])) {
+					player.sendMessage(messages.getMessage("error"));
+				}
+				return true;
+			} else {
+				player.sendMessage(messages.getMessage("noPermission"));
+			}
+		} 
+		else if (args.length == 1 && args[0].equalsIgnoreCase("list")) {
+			if (allowed) {
+				HashMap<String, Region> regions = region.getRegions();
+				if (regions.isEmpty()) {
+					sender.sendMessage(messages.getMessage("noRegion"));
+					return true;
+				}
 
-	   if (sel == null) {
-		   player.sendMessage(messages.getMessage("noSelection"));
-		   return false;
-	   }
+				for (String s : regions.keySet()) {
+					Region r = regions.get(s);
+					
+					BlockVector min = r.getLowerEdge();
+					BlockVector max = r.getUpperEdge();
+					
+					sender.sendMessage(ChatColor.GOLD + s + ChatColor.GREEN + " [" + min.getBlockX() + ", " + min.getBlockY() + ", " + min.getBlockZ() + "][" 
+									+ max.getBlockX() + ", " + min.getBlockY() + ", " + min.getBlockZ() + "] " + ChatColor.DARK_GREEN + "[" + regions.get(s).getWorld() + "] "
+									+ (regions.get(s).isWorldGuard ? ChatColor.RED
+											+ "[WorldGuard]" : ""));
+				}
+			} else {
+				sender.sendMessage(messages.getMessage("noPermission"));
+			}
+		} 
+		else if (args.length > 1 && args[0].equalsIgnoreCase("delete")) {
+			if (allowed) {
+				StringBuilder sb = new StringBuilder(args[1]);
+				for (int i = 2; i < args.length; i++) {
+					sb.append(" ");
+					sb.append(args[i]);
+				}
+				String regionName = sb.toString();
 
-	   Location max = sel.getMaximumPoint();
-	   Location min = sel.getMinimumPoint();
+				if (!deleteRegionByName(regionName)) {
+					sender.sendMessage(messages.getMessage("noRegion"));
+					return true;
+				}
 
-	   if ((max == null) || (min == null)) {
-		   player.sendMessage(messages.getMessage("selectionIncomplete"));
-		   return false;
-	   }	 
+				sender.sendMessage(messages.getMessage("regionDeleted"));
+			} else {
+				sender.sendMessage(messages.getMessage("noPermission"));
+			}
+		} 
+		else if (args.length == 1 && args[0].equalsIgnoreCase("reload")) {
 
-	   region.addRegion(name, sel.getWorld().getName(), max.getBlockX(), min.getBlockX(),  max.getBlockY(), min.getBlockY(), max.getBlockZ(), min.getBlockZ());
+			if (allowed) {
+				region.loadConfig();
+				sender.sendMessage(messages.getMessage("reload"));
+			} else {
+				sender.sendMessage(messages.getMessage("noPermission"));
+			}
+		} 
+		else if (args.length == 1 && args[0].equalsIgnoreCase("reset")) {
 
-	   player.sendMessage(messages.getMessage("regionAdded"));
-	   
-	   return true;
-   }
-   
-   public boolean createRegion(Player player, String name, String wg)
-   {
-	   if (this.worldGuard == null) {
-		   player.sendMessage(messages.getMessage("noWorldGuard"));
-		   return false;
-	   }
-	   
-	   com.sk89q.worldguard.protection.managers.RegionManager rm = this.worldGuard.getRegionManager(player.getWorld());
-	   if(!rm.hasRegion(wg))
-	   {
-		   World w = Bukkit.getServer().getWorld(wg);
-		   if(w!=null)
-		   {
-			  return createRegion(player, name, w); 
-		   }
-		   else
-		   {
-			   player.sendMessage(messages.getMessage("regionNotFound"));
-			   return false;
-		   }
-	   }
-	   region.addRegionWG(name, player.getWorld().getName(), wg);
-	   player.sendMessage(messages.getMessage("regionAdded"));
-	   
-	   return true;
-   }
-   
-   public boolean createRegion(Player p, String name, World w)
-   {
-	   region.addRegion(name, w);
-	   p.sendMessage(messages.getMessage("regionAdded"));
-	   return true;
-   }
-   
- }
+			if (allowed) {
+				inventoryFile.delete();
+				offlineregions.delete();
+				rewardFile.delete();
+				region.reset();
+				region.loadConfig();
+				rewards.clear();
+				sender.sendMessage(messages.getMessage("reset"));
+			} else {
+				sender.sendMessage(messages.getMessage("noPermission"));
+			}
+		} else {
+			return false;
+		}
+
+		return true;
+	}
+
+	public boolean createRegion(Player player, String name) {
+		if (this.worldEdit == null) {
+			player.sendMessage(messages.getMessage("noWorldEdit"));
+			return false;
+		}
+
+		Selection sel = this.worldEdit.getSelection(player);
+
+		if (sel == null) {
+			player.sendMessage(messages.getMessage("noSelection"));
+			return false;
+		}
+
+		Location max = sel.getMaximumPoint();
+		Location min = sel.getMinimumPoint();
+
+		if ((max == null) || (min == null)) {
+			player.sendMessage(messages.getMessage("selectionIncomplete"));
+			return false;
+		}
+
+		region.addRegion(name, sel.getWorld().getName(), min.toVector().toBlockVector(), max.toVector().toBlockVector());
+
+		player.sendMessage(messages.getMessage("regionAdded"));
+
+		return true;
+	}
+
+	public boolean createRegion(Player player, String name, String wg) {
+		if (this.worldGuard == null) {
+			player.sendMessage(messages.getMessage("noWorldGuard"));
+			return false;
+		}
+
+		com.sk89q.worldguard.protection.managers.RegionManager rm = this.worldGuard.getRegionManager(player.getWorld());
+		if (!rm.hasRegion(wg)) {
+			World w = Bukkit.getServer().getWorld(wg);
+			if (w != null) {
+				return createRegion(player, name, w);
+			} else {
+				player.sendMessage(messages.getMessage("regionNotFound"));
+				return false;
+			}
+		}
+		region.addRegionWG(name, player.getWorld().getName(), wg);
+		player.sendMessage(messages.getMessage("regionAdded"));
+
+		return true;
+	}
+	
+	private boolean deleteRegionByName(String name) {
+		Region r = region.getRegionByName(name);
+		if (r != null) {
+			region.deleteRegion(r);
+			return true;
+		}
+		return false;
+	}
+
+	public boolean createRegion(Player p, String name, World w) {
+		region.addRegion(name, w);
+		p.sendMessage(messages.getMessage("regionAdded"));
+		return true;
+	}
+	
+	public RegionManager getRegionManager() {
+		return region;
+	}
+
+	public RewardManager getRewardManager() {
+		return rewards;
+	}
+
+	public Messages getMessages(){
+		return messages;
+	}
+	
+	public WorldEditPlugin getWorldEdit() {
+		return this.worldEdit;
+	}
+	
+	public WorldGuardPlugin getWorldGuard() {
+		return this.worldGuard;
+	}
+
+	public boolean isWorldEditSet() {
+		return this.worldEdit != null;
+	}
+	
+	public boolean isWorldGuardSet() {
+		return this.worldGuard != null;
+	}
+	
+	private void loadInventories() {
+		ObjectInputStream ois = null;
+		try {
+			ois = new ObjectInputStream(new FileInputStream(this.inventoryFile));
+
+			SerializedHashMaps m = (SerializedHashMaps) ois.readObject();
+			region.setInventories(m.inventories);
+			region.setHealthValues(m.healthValues);
+			region.setHungerValues(m.hungerValues);
+			region.setXpValues(m.xpValues);
+		} 
+		catch(EOFException ex) {}
+		catch (Exception ex) {
+			log.warning("[TaxFreeRegion] Error while reading inventory file!");
+			ex.printStackTrace();
+		} finally {
+			if (ois != null) {
+				try {
+					ois.close();
+				} catch (IOException ex) {
+					log.warning("[TaxFreeRegion] Could not close inventories file after reading!");
+				}
+			}
+		}
+	}
+	
+	private void saveInventories() {
+		ObjectOutputStream oos = null;
+		try {
+			oos = new ObjectOutputStream(new FileOutputStream(inventoryFile));
+
+			oos.writeObject(new SerializedHashMaps(region.getInventories(), region.getHealthValues(), region.getXpValues(), region.getHungerValues()));
+		} catch (Exception ex) {
+			log.severe("[TaxFreeRegion] Error while saving inventory file!");
+			ex.printStackTrace();
+		} finally {
+			if (oos != null) {
+				try {
+					oos.close();
+				} catch (IOException ex) {
+					log.warning("[TaxFreeRegion] Could not close inventories file after saving!");
+				}
+			}
+		}
+	}
+
+	@SuppressWarnings("unchecked")
+	private void loadOfflineRegions() {
+		ObjectInputStream ois = null;
+		try {
+			ois = new ObjectInputStream(new FileInputStream(offlineregions));
+
+			region.setOfflinePlayers(((HashMap<String, OfflineRegion>) ois.readObject()));
+		} 
+		catch(EOFException ex) {}
+		catch (Exception ex) {
+			log.warning("[TaxFreeRegion] Error while reading offline region information!");
+			ex.printStackTrace();
+		} finally {
+			if (ois != null) {
+				try {
+					ois.close();
+				} catch (IOException ex) {
+					log.warning("[TaxFreeRegion] Could not close offline-region file after reading!");
+				}
+			}
+		}
+	}
+
+	private void saveOfflineRegions() {
+		ObjectOutputStream oos = null;
+		try {
+			oos = new ObjectOutputStream(new FileOutputStream(offlineregions));
+
+			oos.writeObject(region.getOfflinePlayers());
+		} catch (Exception ex) {
+			log.severe("[TaxFreeRegion] Error while saving offline region information!");
+			ex.printStackTrace();
+		} finally {
+			if (oos != null) {
+				try {
+					oos.close();
+				} catch (IOException ex) {
+					log.warning("[TaxFreeRegion] Could not close offline-region file after saving!");
+				}
+			}
+		}
+	}
+	
+	@SuppressWarnings("unchecked")
+	private void loadRewards() {
+		ObjectInputStream ois = null;
+		try {
+			ois = new ObjectInputStream(new FileInputStream(rewardFile));
+
+			rewards.setRewards((HashMap<String, SavedInventory>) ois.readObject());
+		} 
+		catch(EOFException ex) {}
+		catch (Exception ex) {
+			log.warning("[TaxFreeRegion] Error while reading rewards file!");
+			ex.printStackTrace();
+		} finally {
+			if (ois != null) {
+				try {
+					ois.close();
+				} catch (IOException ex) {
+					log.warning("[TaxFreeRegion] Could not close rewards file after reading!");
+				}
+			}
+		}
+	}
+
+	private void saveRewards() {
+		ObjectOutputStream oos = null;
+		try {
+			oos = new ObjectOutputStream(new FileOutputStream(rewardFile));
+
+			oos.writeObject(this.rewards.getRewards());
+		} catch (Exception ex) {
+			log.severe("[TaxFreeRegion] Error while saving rewards file!");
+			ex.printStackTrace();
+		} finally {
+			if (oos != null)
+				try {
+					oos.close();
+				} catch (IOException ex) {
+					log.warning("[TaxFreeRegion] Could not close rewards file after saving!");
+				}
+		}
+	}
+}

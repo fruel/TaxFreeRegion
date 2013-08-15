@@ -18,13 +18,11 @@
 package at.lukasf.taxfreeregion;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
-import java.util.logging.Level;
 
 import org.bukkit.Location;
-import org.bukkit.Material;
 import org.bukkit.block.Block;
-import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -47,20 +45,48 @@ import org.bukkit.event.player.PlayerPickupItemEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerRespawnEvent;
 import org.bukkit.event.player.PlayerTeleportEvent;
+import org.bukkit.event.vehicle.VehicleDamageEvent;
+import org.bukkit.util.Vector;
 
 import at.lukasf.taxfreeregion.region.Region;
 import at.lukasf.taxfreeregion.region.Region.DenyMode;
 import at.lukasf.taxfreeregion.region.RegionManager;
 
-
 public class PlayerListener implements Listener
 {
+	private static final HashMap<Integer, Integer> entityItemMapping;
+	
+	static {
+		entityItemMapping = new HashMap<Integer, Integer>();
+		entityItemMapping.put(9, 321); //painting
+		entityItemMapping.put(10, 262); //arrow
+		entityItemMapping.put(11, 332); //snowball
+		entityItemMapping.put(13, 385); //small-fireball
+		entityItemMapping.put(14, 368); //ender pearl
+		entityItemMapping.put(15, 381); //ender signal
+		entityItemMapping.put(17, 384); //xp bottle
+		entityItemMapping.put(18, 389); //item frame
+		entityItemMapping.put(20, 46); //tnt
+		entityItemMapping.put(22, 401); //firework
+		entityItemMapping.put(41, 333); //boat
+		entityItemMapping.put(42, 328); //minecart
+		entityItemMapping.put(43, 342); //minecart chest
+		entityItemMapping.put(44, 343); //minecart furnance
+		entityItemMapping.put(45, 407); //minecart tnt
+		entityItemMapping.put(46, 408); //minecart hopper
+	}	
+	
 	private RegionManager regionManager;
+	private TaxFreeRegion plugin;
+	
+	//block players from doing anything after respawn until they move 
+	//ensures that all region restrictions are applied correctly
 	private HashSet<String> lockedPlayers = new HashSet<String>();
 
 	public PlayerListener(TaxFreeRegion plugin)
 	{
-		regionManager = plugin.getRegionManager();
+		this.plugin = plugin;
+		this.regionManager = plugin.getRegionManager();
 	}
 
 	@EventHandler(priority = EventPriority.HIGHEST)
@@ -76,41 +102,27 @@ public class PlayerListener implements Listener
 		if (regionManager.isPlayerInsideRegion(event.getPlayer()))
 		{
 			Region r = regionManager.getRegionForPlayer(event.getPlayer());
-			Block block = event.getClickedBlock();
 			
 			if (event.getAction().equals(Action.RIGHT_CLICK_BLOCK)  || event.getAction().equals(Action.RIGHT_CLICK_AIR))
 			{
-				if(event.getMaterial() == Material.EYE_OF_ENDER && checkDenyMode(r.getEyeOfEnderDenyMode(), event.getPlayer().getLocation(), r,18))
-				{
-					event.setCancelled(true);
-					return;
-				}
-				if(event.getItem() != null && event.getItem().getType().equals(Material.HOPPER_MINECART) 
-				   && checkDenyMode(r.getDispenserDenyMode(), (block != null ? block.getLocation() : event.getPlayer().getLocation()), r,7)) {
-					event.setCancelled(true);
-					event.getPlayer().sendMessage(TaxFreeRegion.messages.getMessage("blacklisted"));
-					return;
-				}
-				
+				DenyMode mode;
+				if(!event.getMaterial().isBlock() && (mode = r.getUsageDenyMode(event.getMaterial().getId())) != DenyMode.NONE){
+					if(mode == DenyMode.FULL || (mode == DenyMode.BORDER && isInBorder(event.getPlayer().getLocation(), r, 20))) {
+						event.setCancelled(true);
+						event.getPlayer().sendMessage(plugin.getMessages().getMessage("blacklisted"));
+						return;
+					}
+				}				
 			}
 			if (event.getAction().equals(Action.RIGHT_CLICK_BLOCK))
 			{
-				if((block.getType().equals(Material.CHEST) || block.getType().equals(Material.FURNACE) || 
-					block.getType().equals(Material.TRAPPED_CHEST) || block.getType().equals(Material.ENDER_CHEST) ||
-					block.getType().equals(Material.BREWING_STAND) || block.getType().equals(Material.BEACON)) 
-					&& checkDenyMode(r.getChestDenyMode(), block.getLocation(), r,5))
-				{					
-					event.setCancelled(true);
-					event.getPlayer().sendMessage(TaxFreeRegion.messages.getMessage("blacklisted"));	
-					return;
-				}
-				if((block.getType().equals(Material.DISPENSER) || block.getType().equals(Material.DROPPER) ||
-					block.getType().equals(Material.HOPPER)) 
-					&& checkDenyMode(r.getDispenserDenyMode(),block.getLocation(), r,7))
-				{					
-					event.setCancelled(true);
-					event.getPlayer().sendMessage(TaxFreeRegion.messages.getMessage("blacklisted"));
-					return;
+				DenyMode mode;
+				if((mode = r.getUsageDenyMode(event.getClickedBlock().getType().getId())) != DenyMode.NONE){
+					if(mode == DenyMode.FULL || (mode == DenyMode.BORDER && isInBorder(event.getPlayer().getLocation(), r, 10))) {
+						event.setCancelled(true);
+						event.getPlayer().sendMessage(plugin.getMessages().getMessage("blacklisted"));
+						return;
+					}
 				}
 			}
 		}
@@ -137,18 +149,23 @@ public class PlayerListener implements Listener
 			return;
 		}
 		
-		if (event.isCancelled()|| event.getPlayer().hasPermission("taxfreeregion.passthrough")) return;
+		if (event.isCancelled() || event.getPlayer().hasPermission("taxfreeregion.passthrough")) return;
 
 		if (regionManager.isPlayerInsideRegion(event.getPlayer()))
 		{
-			Region r = regionManager.getRegionForPlayer(event.getPlayer());
-			if(checkDenyMode(r.getStorageMinecartDenyMode(), event.getRightClicked().getLocation(), r,5)) {		  
-				Entity entity = event.getRightClicked();
-
-				if ((entity.getClass().getName().contains("StorageMinecart")))
-				{
-					event.setCancelled(true);
-					event.getPlayer().sendMessage(TaxFreeRegion.messages.getMessage("blacklisted"));
+			int entitiyId = event.getRightClicked().getType().getTypeId();
+			
+			if(entityItemMapping.containsKey(entitiyId)) {
+				Region r = regionManager.getRegionForPlayer(event.getPlayer());
+				int item = entityItemMapping.get(entitiyId);
+			
+				DenyMode mode;
+				if((mode = r.getUsageDenyMode(item)) != DenyMode.NONE){
+					if(mode == DenyMode.FULL || (mode == DenyMode.BORDER && isInBorder(event.getPlayer().getLocation(), r, 5))) {
+						event.setCancelled(true);
+						event.getPlayer().sendMessage(plugin.getMessages().getMessage("blacklisted"));
+						return;
+					}
 				}
 			}
 		}
@@ -167,10 +184,7 @@ public class PlayerListener implements Listener
 		}
 		catch(Exception ex)
 		{
-			TaxFreeRegion.log.log(Level.SEVERE, "[TaxFreeRegion] onPlayerMove Exception: " + ex.getMessage());
-			try{
-				event.getPlayer().sendMessage("TaxFreeRegion Error: " + ex.getMessage());}catch(Exception e){}
-			ex.printStackTrace();
+			TaxFreeRegion.log.severe("[TaxFreeRegion] onPlayerMove Exception: " + ex.getMessage());	
 		}
 	}
 	
@@ -198,7 +212,7 @@ public class PlayerListener implements Listener
 			if(r.isCommandWhiteListed(msg)) return;
 
 			if (r.isCommandBlackListed(msg)) {
-				player.sendMessage(TaxFreeRegion.messages.getMessage("blacklisted"));
+				player.sendMessage(plugin.getMessages().getMessage("blacklisted"));
 				event.setCancelled(true);
 				return;
 			}
@@ -206,7 +220,7 @@ public class PlayerListener implements Listener
 			for(Region reg : regionManager.getRegions().values()){
 				if(reg.equals(r)) continue;
 				if (reg.isCommandWhiteListed(msg)) {
-					player.sendMessage(TaxFreeRegion.messages.getMessage("whitelisted"));
+					player.sendMessage(plugin.getMessages().getMessage("whitelisted"));
 					event.setCancelled(true);
 					break;
 				}
@@ -217,7 +231,7 @@ public class PlayerListener implements Listener
 		{
 			for(Region reg : regionManager.getRegions().values()){
 				if (reg.isCommandWhiteListed(msg)) {
-					player.sendMessage(TaxFreeRegion.messages.getMessage("whitelisted"));
+					player.sendMessage(plugin.getMessages().getMessage("whitelisted"));
 					event.setCancelled(true);
 					break;
 				}
@@ -233,7 +247,7 @@ public class PlayerListener implements Listener
 		if (regionManager.isPlayerInsideRegion(event.getPlayer()))
 		{
 			Region r = regionManager.getRegionForPlayer(event.getPlayer());
-			if(checkDenyMode(r.getItemDropsDenyMode(), event.getPlayer().getLocation(), r,7))
+			if(r.isItemDropsDenied() == DenyMode.FULL || (r.isItemDropsDenied() == DenyMode.BORDER && isInBorder(event.getPlayer().getLocation(), r,7)))
 				event.setCancelled(true);
 		}
 	}
@@ -249,7 +263,7 @@ public class PlayerListener implements Listener
 		}
 		catch(Exception ex)
 		{
-			TaxFreeRegion.log.log(Level.SEVERE, "[TaxFreeRegion] onPlayerQuit Exception: " + ex.getMessage());
+			TaxFreeRegion.log.severe("[TaxFreeRegion] onPlayerQuit Exception: " + ex.getMessage());
 			ex.printStackTrace();
 		}
 	}
@@ -259,17 +273,51 @@ public class PlayerListener implements Listener
 
 		if(event instanceof PlayerDeathEvent)
 		{
-			PlayerDeathEvent ev = (PlayerDeathEvent)event;
+			Player p = (Player)((PlayerDeathEvent)event).getEntity();
 			
-			if (((Player)ev.getEntity()).hasPermission("taxfreeregion.passthrough")) return;
+			if (p.hasPermission("taxfreeregion.passthrough")) return;
 			
-			if(regionManager.isPlayerInsideRegion((Player)ev.getEntity())){	
-				Region r = regionManager.getRegionForPlayer((Player)event.getEntity());
-				if(checkDenyMode(r.getDeathDropsDenyMode(), event.getEntity().getLocation(), r,10))
-					ev.getDrops().clear();
+			if(regionManager.isPlayerInsideRegion(p)){	
+				Region r = regionManager.getRegionForPlayer(p);				
+				if(r.isDeathDropsDenied() == DenyMode.FULL || (r.isDeathDropsDenied() == DenyMode.BORDER && isInBorder(p.getLocation(), r,10)))
+					event.getDrops().clear();
 			}
 		}
+		else {
+			Region r = regionManager.getRegionForLocation(event.getEntity().getLocation());
+			if(r.isItemDropsDenied() == DenyMode.FULL || (r.isItemDropsDenied() == DenyMode.BORDER && isInBorder(event.getEntity().getLocation(), r,10)))
+				event.getDrops().clear();
+		}
 	}  
+	
+	@EventHandler(priority = EventPriority.HIGHEST)
+	public void onVehicleDamage(final VehicleDamageEvent event)
+	{
+		if (event.isCancelled()) return;
+		
+		if(event.getAttacker() instanceof Player){
+			Player p = (Player) event.getAttacker();
+			
+			if (p.hasPermission("taxfreeregion.passthrough")) return;
+
+			int entitiyId = event.getVehicle().getType().getTypeId();
+			
+			if(entityItemMapping.containsKey(entitiyId)) {
+				Region r = regionManager.getRegionForPlayer(p);
+				int item = entityItemMapping.get(entitiyId);
+			
+				DenyMode mode;
+				if((mode = r.getRemoveDenyMode(item)) != DenyMode.NONE){
+					if(mode == DenyMode.FULL || (mode == DenyMode.BORDER && isInBorder(p.getLocation(), r, 5))) {
+						event.setCancelled(true);
+						p.sendMessage(plugin.getMessages().getMessage("blacklisted"));
+						return;
+					}
+				}
+			}			
+		}
+	}
+	
 	@EventHandler(priority = EventPriority.HIGHEST)
 	public void onBlockPistonExtend(BlockPistonExtendEvent event)
 	{
@@ -277,8 +325,8 @@ public class PlayerListener implements Listener
 
 		Region r = regionManager.getRegionForLocation(event.getBlock().getLocation());
 
-		if(r!=null){
-			if(r.getPistonDenyMode()==DenyMode.BORDER){
+		if(r != null){			
+			if(r.getUsageDenyMode(33) == DenyMode.BORDER || (event.isSticky() && r.getUsageDenyMode(29) == DenyMode.BORDER)){
 
 				ArrayList<Block> blocks = new ArrayList<Block>();
 				blocks.addAll(event.getBlocks());
@@ -293,9 +341,12 @@ public class PlayerListener implements Listener
 					}
 				}
 			}
-			else if(r.getPistonDenyMode() == DenyMode.FULL) event.setCancelled(true);
+			else if(r.getUsageDenyMode(33) == DenyMode.FULL || (event.isSticky() && r.getUsageDenyMode(29) == DenyMode.FULL)) {
+				event.setCancelled(true);
+			}
 		}
 	}
+	
 	@EventHandler(priority = EventPriority.HIGHEST)
 	public void onBlockBreak(BlockBreakEvent event)
 	{
@@ -309,27 +360,36 @@ public class PlayerListener implements Listener
 		
 		Region r = regionManager.getRegionForLocation(event.getBlock().getLocation());
 
-		if(r!=null)
+		if(r != null)
 		{
 			if((!regionManager.isPlayerInsideRegion(event.getPlayer()) && r.isCrossPlacingDenyed()))
 			{
-				event.getPlayer().sendMessage(TaxFreeRegion.messages.getMessage("blacklisted"));
+				event.getPlayer().sendMessage(plugin.getMessages().getMessage("blacklisted"));
 				event.setCancelled(true);
 				return;
 			}
 			Region other = regionManager.getRegionForPlayer(event.getPlayer());
 			if (regionManager.isPlayerInsideRegion(event.getPlayer()) && !other.equals(r) && (r.isCrossPlacingDenyed() || other.isCrossPlacingDenyed()))
 			{
-				event.getPlayer().sendMessage(TaxFreeRegion.messages.getMessage("blacklisted"));
+				event.getPlayer().sendMessage(plugin.getMessages().getMessage("blacklisted"));
 				event.setCancelled(true);
 				return;
 			}
-			if(checkDenyMode(r.getBlockDropDenyMode(), event.getBlock().getLocation(), r,5))
+			
+			int id = event.getBlock().getType().getId();
+			if(r.getRemoveDenyMode(id) == DenyMode.FULL || (r.getRemoveDenyMode(id) == DenyMode.BORDER && isInBorder(event.getBlock().getLocation(), r, 5))) {
+				event.getPlayer().sendMessage(plugin.getMessages().getMessage("blacklisted"));
+				event.setCancelled(true);
+				return;
+			}
+			
+			if(r.isBlockDropsDenied() == DenyMode.FULL || (r.isBlockDropsDenied() == DenyMode.BORDER && isInBorder(event.getBlock().getLocation(), r, 5))) {
 				event.getBlock().setTypeId(0);
+			}
 		}
 		else if(regionManager.isPlayerInsideRegion(event.getPlayer()) && regionManager.getRegionForPlayer(event.getPlayer()).isCrossPlacingDenyed())
 		{
-			event.getPlayer().sendMessage(TaxFreeRegion.messages.getMessage("blacklisted"));
+			event.getPlayer().sendMessage(plugin.getMessages().getMessage("blacklisted"));
 			event.setCancelled(true);
 			return;
 		}
@@ -347,21 +407,28 @@ public class PlayerListener implements Listener
 		{
 			if((!regionManager.isPlayerInsideRegion(event.getPlayer()) && r.isCrossPlacingDenyed()))
 			{
-				event.getPlayer().sendMessage(TaxFreeRegion.messages.getMessage("blacklisted"));
+				event.getPlayer().sendMessage(plugin.getMessages().getMessage("blacklisted"));
 				event.setCancelled(true);
 				return;
 			}
 			Region other = regionManager.getRegionForPlayer(event.getPlayer());
 			if (regionManager.isPlayerInsideRegion(event.getPlayer()) && !other.equals(r) && (r.isCrossPlacingDenyed() || other.isCrossPlacingDenyed()))
 			{
-				event.getPlayer().sendMessage(TaxFreeRegion.messages.getMessage("blacklisted"));
+				event.getPlayer().sendMessage(plugin.getMessages().getMessage("blacklisted"));
+				event.setCancelled(true);
+				return;
+			}
+			
+			int id = event.getBlock().getType().getId();
+			if(r.getPlaceDenyMode(id) == DenyMode.FULL || (r.getPlaceDenyMode(id) == DenyMode.BORDER && isInBorder(event.getBlock().getLocation(), r, 5))) {
+				event.getPlayer().sendMessage(plugin.getMessages().getMessage("blacklisted"));
 				event.setCancelled(true);
 				return;
 			}
 		}
 		else if(regionManager.isPlayerInsideRegion(event.getPlayer()) && regionManager.getRegionForPlayer(event.getPlayer()).isCrossPlacingDenyed())
 		{
-			event.getPlayer().sendMessage(TaxFreeRegion.messages.getMessage("blacklisted"));
+			event.getPlayer().sendMessage(plugin.getMessages().getMessage("blacklisted"));
 			event.setCancelled(true);
 			return;
 		}
@@ -374,7 +441,6 @@ public class PlayerListener implements Listener
 		
 		lockedPlayers.add(event.getPlayer().getName());
 	}
-	 
 
 	@EventHandler(priority = EventPriority.MONITOR)
 	public void onPlayerTeleport(PlayerTeleportEvent event)
@@ -401,7 +467,7 @@ public class PlayerListener implements Listener
 		}
 		catch(Exception ex)
 		{
-			TaxFreeRegion.log.log(Level.SEVERE, "[TaxFreeRegion] onPlayerTeleport Exception: " + ex.getMessage());
+			TaxFreeRegion.log.severe("[TaxFreeRegion] onPlayerTeleport Exception: " + ex.getMessage());
 			ex.printStackTrace();
 		}
 	}
@@ -418,7 +484,7 @@ public class PlayerListener implements Listener
 		{
 			if((src != null && src.isCrossPlacingDenyed()) || (target != null && target.isCrossPlacingDenyed()))
 			{
-				event.getPlayer().sendMessage(TaxFreeRegion.messages.getMessage("blacklisted"));
+				event.getPlayer().sendMessage(plugin.getMessages().getMessage("blacklisted"));
 				event.setCancelled(true);
 				return;
 			}
@@ -437,7 +503,7 @@ public class PlayerListener implements Listener
 		{
 			if((src != null && src.isCrossPlacingDenyed()) || (target != null && target.isCrossPlacingDenyed()))
 			{
-				event.getPlayer().sendMessage(TaxFreeRegion.messages.getMessage("blacklisted"));
+				event.getPlayer().sendMessage(plugin.getMessages().getMessage("blacklisted"));
 				event.setCancelled(true);
 				return;
 			}
@@ -445,16 +511,8 @@ public class PlayerListener implements Listener
 		
 	}
 
-	private boolean checkDenyMode(DenyMode d, Location pos, Region r, int border)
+	private boolean isInBorder(Location pos, Region r, int border)
 	{
-		switch(d)
-		{
-		case NONE: return false;
-		case FULL: return true;
-		case BORDER:
-			Region reg = Region.createDummy(r.getX1()-border, r.getX2()+border, r.getY1()-border, r.getY2()+border, r.getZ1()-border, r.getZ2()+border, r.getWorld());
-			return r.contains(pos) && !reg.contains(pos);
-		}
-		return true;
+		return r.contains(pos) && !pos.toVector().isInAABB(r.getLowerEdge().add(new Vector(border, border, border)), r.getUpperEdge().subtract(new Vector(border, border, border)));
 	}
 }
