@@ -32,6 +32,7 @@ import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockPistonExtendEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.entity.EntityDeathEvent;
+import org.bukkit.event.entity.ItemSpawnEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.player.PlayerBucketEmptyEvent;
 import org.bukkit.event.player.PlayerBucketFillEvent;
@@ -290,6 +291,18 @@ public class PlayerListener implements Listener
 					event.getDrops().clear();
 			}
 		}
+	}  
+	
+	@EventHandler(priority = EventPriority.HIGHEST)
+	public void onItemSpawn(final ItemSpawnEvent event) {
+		if (event.isCancelled()) return;
+		
+		Region r = regionManager.getRegionForLocation(event.getLocation());
+		if(r != null){
+			if(r.isBlockDropsDenied() == DenyMode.FULL || (r.isBlockDropsDenied() == DenyMode.BORDER && isInBorder(event.getLocation(), r,10))) {
+				event.setCancelled(true);
+			}
+		}		
 	}  
 	
 	@EventHandler(priority = EventPriority.HIGHEST)
