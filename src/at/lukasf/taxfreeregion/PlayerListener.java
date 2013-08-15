@@ -285,8 +285,10 @@ public class PlayerListener implements Listener
 		}
 		else {
 			Region r = regionManager.getRegionForLocation(event.getEntity().getLocation());
-			if(r.isItemDropsDenied() == DenyMode.FULL || (r.isItemDropsDenied() == DenyMode.BORDER && isInBorder(event.getEntity().getLocation(), r,10)))
-				event.getDrops().clear();
+			if(r != null){
+				if(r.isItemDropsDenied() == DenyMode.FULL || (r.isItemDropsDenied() == DenyMode.BORDER && isInBorder(event.getEntity().getLocation(), r,10)))
+					event.getDrops().clear();
+			}
 		}
 	}  
 	
